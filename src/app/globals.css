@@ -3,64 +3,1373 @@
 @tailwind utilities;
 
 :root {
-  --bg: #0b0b0d;
-  --text: #f8f4ef;
-  --accent: #ff6b6b;
-  --warning: #e53935;
-  --cream: #f5f0e8;
-}
-
-* {
-  box-sizing: border-box;
+  --bg: #161c24;
+  --text: #ffffff;
+  --muted: #919eab;
+  --accent: #ff5630;
+  --card: #202834;
 }
 
 html,
 body {
-  height: 100%;
-  overflow: hidden;
+  min-height: 100%;
 }
 
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: var(--font-display), system-ui, -apple-system, sans-serif;
+  font-family: var(--font-public-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
-}
-
-.glass {
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.scanlines::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(255, 255, 255, 0.015) 2px,
-    rgba(255, 255, 255, 0.015) 4px
-  );
-  border-radius: inherit;
 }
 
 @keyframes livePulse {
   0%,
   100% {
     opacity: 1;
-    box-shadow: 0 0 0 0 rgba(229, 57, 53, 0.7);
   }
   50% {
-    opacity: 0.6;
-    box-shadow: 0 0 8px 2px rgba(229, 57, 53, 0.4);
+    opacity: 0.45;
+  }
+}
+
+@keyframes liveDotPulse {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(255, 86, 48, 0.55);
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    box-shadow: 0 0 0 5px rgba(255, 86, 48, 0);
+    transform: scale(0.92);
+  }
+}
+
+@keyframes timerDigitCrossfade {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes headerSessionPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.88;
+  }
+}
+
+@keyframes cameraBorderFlash {
+  0% {
+    border-color: rgba(28, 94, 164, 0.45);
+    box-shadow: 0 0 0 0 rgba(255, 86, 48, 0);
+  }
+  35% {
+    border-color: rgba(255, 86, 48, 0.85);
+    box-shadow: 0 0 0 3px rgba(255, 86, 48, 0.25);
+  }
+  100% {
+    border-color: rgba(28, 94, 164, 0.28);
+    box-shadow: 0 0 0 0 rgba(255, 86, 48, 0);
+  }
+}
+
+@keyframes liveFoundPulse {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes cameraScan {
+  0% {
+    top: 8%;
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.55;
+  }
+  85% {
+    opacity: 0.55;
+  }
+  100% {
+    top: 92%;
+    opacity: 0;
+  }
+}
+
+@keyframes officerBreathe {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.94;
+  }
+  50% {
+    transform: translateY(-2px) scale(1.01);
+    opacity: 1;
+  }
+}
+
+@keyframes officerLookAround {
+  0%,
+  100% {
+    transform: translateX(0) rotate(0deg);
+  }
+  33% {
+    transform: translateX(-3px) rotate(-1.5deg);
+  }
+  66% {
+    transform: translateX(3px) rotate(1deg);
+  }
+}
+
+@keyframes officerNod {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(4px);
+  }
+  55% {
+    transform: translateY(-1px);
+  }
+}
+
+@keyframes officerIdleFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
   }
 }
 
 .live-dot {
-  animation: livePulse 1.5s ease-in-out infinite;
+  animation: liveDotPulse 1.8s ease-in-out infinite;
+  box-shadow: 0 0 0 0 rgba(255, 86, 48, 0.5);
 }
+
+.video-warm {
+  filter: sepia(0.06) saturate(1.04) brightness(0.98);
+}
+
+.siren-light {
+  contain: layout style paint;
+  transform: translateZ(0);
+}
+
+.siren-light__glow {
+  position: absolute;
+  inset: 8%;
+  border-radius: 50%;
+  pointer-events: none;
+  will-change: opacity;
+  transform: translateZ(0);
+}
+
+.siren-light__glow--red {
+  background: radial-gradient(
+    circle,
+    rgba(255, 86, 48, 0.55) 0%,
+    rgba(255, 86, 48, 0) 70%
+  );
+  animation: sirenGlowRed 1s ease-in-out infinite;
+}
+
+.siren-light__glow--blue {
+  background: radial-gradient(
+    circle,
+    rgba(28, 94, 164, 0.45) 0%,
+    rgba(28, 94, 164, 0) 70%
+  );
+  animation: sirenGlowBlue 1s ease-in-out infinite;
+}
+
+.siren-light__rotate {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  will-change: transform;
+  animation: sirenRotate 2.4s linear infinite;
+  transform: translateZ(0);
+}
+
+.siren-light__beam {
+  position: absolute;
+  width: 42%;
+  height: 14%;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 200, 120, 0) 0%,
+    rgba(255, 220, 140, 0.35) 50%,
+    rgba(255, 200, 120, 0) 100%
+  );
+  opacity: 0.7;
+  will-change: opacity, transform;
+}
+
+.siren-light__beam--offset {
+  transform: rotate(90deg);
+  opacity: 0.45;
+}
+
+.siren-light__dome {
+  width: 72px;
+  height: 72px;
+  border-radius: 50% 50% 45% 45%;
+  background: linear-gradient(180deg, #ff5630 0%, #c73e1d 100%);
+  box-shadow: 0 4px 20px rgba(255, 86, 48, 0.35);
+  animation: sirenPulse 1s ease-in-out infinite;
+  will-change: opacity, transform;
+  transform: translateZ(0);
+}
+
+.siren-light__base {
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  width: 52px;
+  height: 14px;
+  margin-left: -26px;
+  border-radius: 4px;
+  background: #3d4558;
+}
+
+@keyframes sirenGlowRed {
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+@keyframes sirenGlowBlue {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 0.15;
+  }
+}
+
+@keyframes sirenRotate {
+  from {
+    transform: rotate(0deg) translateZ(0);
+  }
+  to {
+    transform: rotate(360deg) translateZ(0);
+  }
+}
+
+@keyframes sirenPulse {
+  0%,
+  100% {
+    opacity: 0.88;
+    transform: scale(1) translateZ(0);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04) translateZ(0);
+  }
+}
+
+.page-grain::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.007;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* —— Locked dashboard shell —— */
+.dashboard-page {
+  position: relative;
+  z-index: 2;
+  margin: 0 auto;
+  max-width: 1180px;
+  padding: 120px 24px 64px;
+  transition: filter 300ms ease;
+}
+
+@media (min-width: 1024px) {
+  .dashboard-page {
+    padding-top: 166px;
+  }
+}
+
+.dashboard-header {
+  text-align: center;
+  margin-bottom: 64px;
+}
+
+.dashboard-headline {
+  font-size: clamp(40px, 5vw, 64px);
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+
+.dashboard-header--active .dashboard-headline {
+  animation: headerSessionPulse 3.5s ease-in-out infinite;
+}
+
+.dashboard-shell {
+  display: grid;
+  grid-template-columns: minmax(680px, 1fr) 340px;
+  gap: 24px;
+  align-items: start;
+  justify-content: center;
+  width: 100%;
+}
+
+@media (max-width: 1180px) {
+  .dashboard-shell {
+    grid-template-columns: 1fr;
+    max-width: 760px;
+    margin: 0 auto;
+  }
+}
+
+.dashboard-camera {
+  width: 100%;
+  min-width: 0;
+}
+
+.dashboard-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 340px;
+  max-width: 100%;
+  flex-shrink: 0;
+}
+
+@media (max-width: 1180px) {
+  .dashboard-rail {
+    width: 100%;
+  }
+}
+
+/* —— Glass cards —— */
+.glass-card {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 24px;
+  background: rgba(32, 40, 52, 0.72);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -12px 24px rgba(0, 0, 0, 0.22),
+    0 0 0 1px rgba(28, 94, 164, 0.14),
+    0 12px 40px rgba(28, 94, 164, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transform: translateZ(0);
+  box-sizing: border-box;
+}
+
+.glass-card:hover {
+  transform: translateY(-1px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -12px 24px rgba(0, 0, 0, 0.22),
+    0 0 0 1px rgba(28, 94, 164, 0.22),
+    0 14px 44px rgba(28, 94, 164, 0.12);
+}
+
+/* —— Camera (fixed 560px) —— */
+.camera-shell {
+  position: relative;
+  height: 560px;
+  min-height: 560px;
+  max-height: 560px;
+  overflow: hidden;
+  padding: 16px;
+  border-radius: 28px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  transition: box-shadow 280ms ease, border-color 280ms ease;
+  border: 1px solid rgba(28, 94, 164, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -12px 24px rgba(0, 0, 0, 0.22),
+    0 0 0 1px rgba(28, 94, 164, 0.18),
+    0 12px 40px rgba(28, 94, 164, 0.1);
+}
+
+.camera-shell--session .camera-shell__feed {
+  box-shadow: inset 0 0 0 1px rgba(28, 94, 164, 0.2);
+}
+
+.camera-shell--active {
+  border-color: rgba(28, 94, 164, 0.38);
+}
+
+.camera-shell--phone-found {
+  border-color: rgba(255, 138, 72, 0.88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 0 0 1px rgba(255, 138, 72, 0.5),
+    0 0 28px rgba(255, 138, 72, 0.16);
+}
+
+.camera-shell--phone-found .camera-shell__feed {
+  box-shadow: inset 0 0 40px rgba(255, 138, 72, 0.08);
+}
+
+.camera-shell--phone-found .camera-live-tag__text {
+  color: #ff8a48;
+}
+
+.camera-shell--phone-found .live-dot {
+  background-color: #ff8a48 !important;
+}
+
+.camera-shell--alert {
+  border-color: rgba(255, 86, 48, 0.5);
+}
+
+.camera-shell--recovered {
+  border-color: rgba(28, 94, 164, 0.32);
+}
+
+.camera-shell--stream-ready .camera-live-tag .live-dot {
+  animation: liveDotPulse 2s ease-in-out infinite;
+}
+
+.camera-suspicious-badge {
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  z-index: 20;
+  display: flex;
+  transform: translateX(-50%);
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  background: rgba(22, 28, 36, 0.9);
+  padding: 6px 12px;
+}
+
+.camera-shell__header {
+  display: flex;
+  flex-shrink: 0;
+  height: 24px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.camera-shell__feed {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 18px;
+}
+
+.camera-shell__video {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity 220ms ease, visibility 220ms ease;
+}
+
+.camera-shell__video--visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.camera-shell__video--hidden {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.camera-shell__snapshot {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease, filter 200ms ease;
+}
+
+.camera-shell__snapshot--visible {
+  opacity: 1;
+}
+
+.camera-shell__snapshot--darken {
+  filter: brightness(0.42) contrast(1.08) saturate(0.85);
+}
+
+.camera-scan-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 4;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(28, 94, 164, 0.65),
+    transparent
+  );
+  opacity: 0.55;
+  animation: cameraScan 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.camera-shell--alert .camera-shell__video,
+.camera-shell--alert .camera-shell__snapshot.camera-shell__snapshot--visible {
+  filter: brightness(0.72) blur(10px) saturate(0.85);
+}
+
+.camera-shell__placeholder {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--card);
+}
+
+/* —— Timer card (340×320) —— */
+.timer-card {
+  width: 100%;
+  height: 320px;
+  min-height: 320px;
+  max-height: 320px;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+  text-align: center;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.timer-card__label {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 18px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.timer-card__hero {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  width: 100%;
+  gap: 16px;
+}
+
+.timer-card__title {
+  flex-shrink: 0;
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.05;
+  color: var(--text);
+}
+
+.timer-card__display {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
+.timer-card__clock {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    monospace;
+  font-size: clamp(84px, 14vw, 96px);
+  font-weight: 800;
+  line-height: 0.85;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  letter-spacing: -0.04em;
+  color: var(--text);
+  min-width: 5.5ch;
+  text-align: center;
+  animation: timerDigitCrossfade 0.32s ease-out both;
+}
+
+.timer-card__minutes {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.timer-card__minutes-input {
+  width: 100%;
+  height: 48px;
+  border: 0;
+  background: rgba(145, 158, 171, 0.16);
+  border-radius: 10px;
+  padding: 0 16px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  outline: none;
+}
+
+.timer-card__minutes-input::placeholder {
+  color: rgba(145, 158, 171, 0.72);
+  font-weight: 600;
+}
+
+.timer-card--lock-pulse {
+  animation: lockPulse 0.52s ease-out both;
+}
+
+.timer-card__status {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: rgba(255, 86, 48, 0.88);
+}
+
+.status-rotate {
+  animation: statusFade 0.5s ease-out both;
+}
+
+.timer-card__actions {
+  flex-shrink: 0;
+  width: 100%;
+}
+
+.timer-card__lock-btn {
+  width: 100%;
+  height: 44px;
+  border-radius: 8px;
+  background: linear-gradient(150.49deg, #ffac82 0%, #ff5630 100%);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text);
+  white-space: nowrap;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.timer-card__lock-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.timer-card__stop-session {
+  width: 100%;
+  height: 44px;
+  border-radius: 8px;
+  border: 1px solid rgba(145, 158, 171, 0.32);
+  background: rgba(32, 40, 52, 0.55);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.timer-card__stop-session:hover {
+  color: rgba(255, 255, 255, 0.88);
+  border-color: rgba(145, 158, 171, 0.5);
+}
+
+/* —— Police card (340×240) —— */
+.police-card {
+  width: 100%;
+  height: 240px;
+  min-height: 240px;
+  max-height: 240px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.police-card__officer {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
+.officer-asset {
+  height: 155px !important;
+  width: auto !important;
+  max-height: 170px;
+  max-width: 170px;
+}
+
+.camera-vignette::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  border-radius: inherit;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 52%,
+    rgba(0, 0, 0, 0.42) 100%
+  );
+}
+
+.camera-grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0.1;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: grainShift 0.12s steps(2) infinite;
+}
+
+.camera-live-tag {
+  animation: liveTagPulse 2.4s ease-in-out infinite;
+}
+
+/* —— Officer companion —— */
+.officer-companion {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 280ms ease, opacity 280ms ease;
+}
+
+.officer-companion--idle {
+  animation: officerBreathe 4.2s ease-in-out infinite;
+}
+
+.officer-companion--watching {
+  animation: officerLookAround 5s ease-in-out infinite;
+}
+
+.officer-companion--alert {
+  animation: officerNod 0.35s ease-in-out 2;
+}
+
+.officer-companion--recovered::after {
+  content: "👍";
+  position: absolute;
+  right: 8%;
+  bottom: 18%;
+  font-size: 28px;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.45));
+  animation: thumbsPop 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.officer-blink {
+  position: absolute;
+  top: 38%;
+  width: 14px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(22, 28, 36, 0.92);
+  pointer-events: none;
+  animation: officerBlink 3.2s ease-in-out infinite;
+}
+
+.officer-blink--left {
+  left: 34%;
+}
+
+.officer-blink--right {
+  right: 34%;
+}
+
+/* —— Viewport siren ambience (single screen effect) —— */
+html.siren-ambient-active,
+body.siren-ambient-active {
+  overflow: hidden;
+}
+
+body.siren-ambient-active::before {
+  content: "";
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 35;
+  pointer-events: none;
+  transform: none;
+  background: radial-gradient(
+    circle at center,
+    rgba(6, 8, 14, 0.22) 0%,
+    transparent 70%
+  );
+  mix-blend-mode: screen;
+  filter: blur(80px);
+  animation:
+    sirenAmbienceColor 8s ease-in-out infinite,
+    sirenAmbienceBreathe 1.8s ease-in-out infinite alternate;
+}
+
+/* —— Alert overlay (card only, viewport-fixed) —— */
+.alert-overlay {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  pointer-events: auto;
+  background: transparent;
+  transform: none;
+}
+
+.alert-overlay--open {
+  animation: overlayFadeIn 280ms ease-out both;
+}
+
+.alert-card--figma {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 640px;
+  padding: 36px 32px 28px;
+  border-radius: 24px;
+  border: 1px solid rgba(28, 94, 164, 0.28);
+  background: rgba(32, 40, 52, 0.94);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.45);
+  text-align: center;
+  animation:
+    alertCardPop 300ms cubic-bezier(0.22, 1, 0.36, 1) both,
+    alertCardAmbientGlow 3.6s ease-in-out infinite alternate;
+}
+
+.alert-card__siren-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.alert-card__mode {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.alert-card__title {
+  margin-top: 8px;
+  font-size: clamp(36px, 5vw, 48px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.alert-card__subtitle {
+  margin-top: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.alert-card__message {
+  margin-top: 22px;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--text);
+  animation: alertMessageIn 320ms ease-out both;
+}
+
+.alert-card__actions {
+  margin-top: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.alert-card__btn {
+  width: 100%;
+  height: 44px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.alert-card__btn--primary {
+  background: linear-gradient(160.24deg, #c3daf4 0%, #1c5ea4 100%);
+  color: var(--text);
+  border: 0;
+}
+
+.alert-card__btn--secondary {
+  background: transparent;
+  border: 1px solid rgba(145, 158, 171, 0.32);
+  color: var(--muted);
+}
+
+/* —— Top toast —— */
+.top-toast__text {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 138, 72, 0.45);
+  background: rgba(22, 28, 36, 0.92);
+  padding: 8px 16px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #ff8a48;
+}
+
+/* —— Debug panel (temp) —— */
+.debug-panel {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: 80;
+  border-radius: 8px;
+  border: 1px solid rgba(145, 158, 171, 0.2);
+  background: rgba(12, 16, 22, 0.88);
+  padding: 8px 10px;
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  line-height: 1.45;
+  color: rgba(145, 158, 171, 0.95);
+  pointer-events: none;
+}
+
+@keyframes sirenAmbienceColor {
+  0%,
+  100% {
+    background: radial-gradient(
+      circle at center,
+      rgba(6, 8, 14, 0.22) 0%,
+      transparent 70%
+    );
+  }
+  25% {
+    background: radial-gradient(
+      circle at center,
+      rgba(32, 92, 255, 0.14) 0%,
+      transparent 70%
+    );
+  }
+  50% {
+    background: radial-gradient(
+      circle at center,
+      rgba(6, 8, 14, 0.22) 0%,
+      transparent 70%
+    );
+  }
+  75% {
+    background: radial-gradient(
+      circle at center,
+      rgba(255, 48, 48, 0.1) 0%,
+      transparent 70%
+    );
+  }
+}
+
+@keyframes sirenAmbienceBreathe {
+  0% {
+    opacity: 0;
+    transform: scale(1);
+  }
+  35% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+  65% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+@keyframes alertCardAmbientGlow {
+  0% {
+    box-shadow:
+      0 32px 80px rgba(0, 0, 0, 0.45),
+      0 0 60px rgba(30, 90, 255, 0.08);
+  }
+  100% {
+    box-shadow:
+      0 32px 80px rgba(0, 0, 0, 0.45),
+      0 0 60px rgba(255, 50, 50, 0.08);
+  }
+}
+
+@keyframes overlayFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes overlayFadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes alertCardPop {
+  from {
+    opacity: 0;
+    transform: scale(0.98) translateZ(0);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateZ(0);
+  }
+}
+
+@keyframes alertMessageIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* —— Micro-interactions —— */
+.btn-lift {
+  transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn-lift:hover {
+  transform: translateY(-1px);
+}
+
+.btn-lift:active {
+  transform: translateY(0);
+}
+
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInDelayed {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateZ(0);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateZ(0);
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1) translateZ(0);
+  }
+  50% {
+    transform: scale(1.008) translateZ(0);
+  }
+}
+
+@keyframes pulseRing {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes shameFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.4s ease-out both;
+}
+
+.fade-in-delayed {
+  animation: fadeInDelayed 0.5s ease-out 0.05s both;
+}
+
+
+.animate-pulse-ring {
+  animation: pulseRing 3s ease-in-out infinite;
+}
+
+.alert-card {
+  transform: translateZ(0);
+}
+
+.shame-fade {
+  animation: shameFade 0.4s ease-out both;
+}
+
+.toast-enter {
+  animation: toastIn 0.35s ease-out both;
+}
+
+.officer-idle {
+  animation: officerIdle 3s ease-in-out infinite;
+}
+
+.officer-watching {
+  filter: brightness(1.05);
+  transition: filter 0.3s ease;
+}
+
+.officer-alert {
+  filter: brightness(1.1);
+  transition: filter 0.25s ease;
+}
+
+@keyframes officerIdle {
+  0%,
+  100% {
+    opacity: 0.92;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes cameraZoom {
+  0%,
+  100% {
+    transform: scale(1) translateZ(0);
+  }
+  50% {
+    transform: scale(1.025) translateZ(0);
+  }
+}
+
+@keyframes grainShift {
+  0% {
+    transform: translate(0, 0);
+  }
+  100% {
+    transform: translate(-2%, -1%);
+  }
+}
+
+@keyframes exposureBreathe {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes liveTagPulse {
+  0%,
+  100% {
+    opacity: 1;
+    filter: brightness(1);
+  }
+  50% {
+    opacity: 0.72;
+    filter: brightness(1.15);
+  }
+}
+
+@keyframes timerTick {
+  0% {
+    opacity: 0.55;
+    transform: translateY(2px) scale(0.992);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes timerLockIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes lockPulse {
+  0% {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04),
+      0 0 0 0 rgba(255, 86, 48, 0.45);
+  }
+  45% {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04),
+      0 0 0 6px rgba(255, 86, 48, 0);
+  }
+  100% {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04),
+      0 0 0 0 rgba(255, 86, 48, 0);
+  }
+}
+
+@keyframes statusFade {
+  from {
+    opacity: 0;
+    letter-spacing: 0.22em;
+  }
+  to {
+    opacity: 1;
+    letter-spacing: 0.28em;
+  }
+}
+
+@keyframes officerLook {
+  0%,
+  100% {
+    transform: rotate(0deg) translateX(0);
+  }
+  35% {
+    transform: rotate(-1.2deg) translateX(-3px);
+  }
+  70% {
+    transform: rotate(1deg) translateX(3px);
+  }
+}
+
+@keyframes officerShake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-2px);
+  }
+  40% {
+    transform: translateX(2px);
+  }
+  60% {
+    transform: translateX(-1px);
+  }
+  80% {
+    transform: translateX(1px);
+  }
+}
+
+@keyframes officerBlink {
+  0%,
+  42%,
+  44%,
+  100% {
+    transform: scaleY(1);
+    opacity: 0;
+  }
+  43% {
+    transform: scaleY(0.15);
+    opacity: 1;
+  }
+}
+
+@keyframes thumbsPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6) rotate(-12deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+

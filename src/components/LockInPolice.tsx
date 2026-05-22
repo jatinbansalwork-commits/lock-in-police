@@ -1,308 +1,357 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertModal } from "./AlertModal";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AlertMode } from "./AlertMode";
+import { BentoCard } from "./BentoCard";
 import { CameraPreview } from "./CameraPreview";
-import { LiveIndicator } from "./LiveIndicator";
+import { DebugPanel } from "./DebugPanel";
+import { FocusTimerCard } from "./FocusTimerCard";
 import { PoliceMascot } from "./PoliceMascot";
-import { SessionComplete } from "./SessionComplete";
-import { ShameDispatch } from "./ShameDispatch";
-import { DEFAULT_MINUTES, SHAME_MESSAGES } from "@/lib/constants";
-import type { AppScreen, MascotState } from "@/lib/types";
+import { Toast } from "./Toast";
+import { TopToast } from "./TopToast";
+import { pickAlertMessage } from "@/lib/alertMessages";
 import {
-  computeFocusScore,
-  formatTimerDisplay,
-  pickRandom,
-} from "@/lib/utils";
-import { useDistractionDetection } from "@/hooks/useDistractionDetection";
+  PHONE_WARNING_DURATION_MS,
+  RECOVERY_DURATION_MS,
+  SURVEILLANCE_FREEZE_MS,
+  SURVEILLANCE_RESUME_MS,
+} from "@/lib/constants";
+import type {
+  CameraState,
+  DetectionDebug,
+  OfficerVariant,
+  SessionState,
+  SurveillancePhase,
+} from "@/lib/types";
+import { isValidMinutesInput, parseMinutesInput } from "@/lib/utils";
+import { usePhoneObjectDetection } from "@/hooks/usePhoneObjectDetection";
+import { useSirenSound } from "@/hooks/useSirenSound";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
+import { useUIClick } from "@/hooks/useUIClick";
 
 export function LockInPolice() {
-  const [screen, setScreen] = useState<AppScreen>("home");
-  const [minutes, setMinutes] = useState(DEFAULT_MINUTES);
+  const [sessionState, setSessionState] = useState<SessionState>("IDLE");
+  const sessionStateRef = useRef<SessionState>("IDLE");
+  const [minutesInput, setMinutesInput] = useState("");
   const [secondsLeft, setSecondsLeft] = useState(0);
-  const [violations, setViolations] = useState(0);
-  const [alertOpen, setAlertOpen] = useState(false);
-  const [shameOpen, setShameOpen] = useState(false);
-  const [shameMessage, setShameMessage] = useState(SHAME_MESSAGES[0]);
-  const [mascotState, setMascotState] = useState<MascotState>("idle");
-  const [completedMinutes, setCompletedMinutes] = useState(0);
 
-  const alertCooldownRef = useRef(false);
-  const totalSecondsRef = useRef(0);
-  const { speakLines, stop } = useSpeechSynthesis();
+  const [surveillancePhase, setSurveillancePhase] =
+    useState<SurveillancePhase>("live");
+  const [alertMessage, setAlertMessage] = useState("");
+  const [streamReady, setStreamReady] = useState(false);
+  const [justLocked, setJustLocked] = useState(false);
 
-  const handleDistraction = useCallback(() => {
-    if (screen !== "active" || alertCooldownRef.current) return;
+  const [topToastVisible, setTopToastVisible] = useState(false);
+  const [bottomToastVisible, setBottomToastVisible] = useState(false);
+  const [bottomToastMessage, setBottomToastMessage] = useState("");
 
-    alertCooldownRef.current = true;
-    setViolations((v) => v + 1);
-    setMascotState("siren");
-    setAlertOpen(true);
-    setShameMessage(pickRandom(SHAME_MESSAGES));
-
-    speakLines();
-
-    window.setTimeout(() => {
-      setAlertOpen(false);
-      setShameOpen(true);
-      setMascotState("angry");
-    }, 3200);
-
-    window.setTimeout(() => {
-      alertCooldownRef.current = false;
-    }, 8000);
-  }, [screen, speakLines]);
-
-  const { simulate } = useDistractionDetection({
-    enabled: screen === "active" && !alertOpen && !shameOpen,
-    onDistraction: handleDistraction,
+  const [detectionDebug, setDetectionDebug] = useState<DetectionDebug>({
+    phone: false,
+    confidence: 0,
   });
 
-  const startSession = () => {
-    const total = Math.max(1, minutes) * 60;
-    totalSecondsRef.current = total;
-    setSecondsLeft(total);
-    setViolations(0);
-    setScreen("active");
-    setMascotState("looking");
-    setAlertOpen(false);
-    setShameOpen(false);
-    alertCooldownRef.current = false;
-  };
+  const lastAlertMessageRef = useRef<string | null>(null);
+  const [detectionVideo, setDetectionVideo] = useState<HTMLVideoElement | null>(
+    null
+  );
+  const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sequenceTimersRef = useRef<number[]>([]);
+  const phoneStillVisibleRef = useRef(false);
 
-  const endSession = useCallback(() => {
-    stop();
-    setAlertOpen(false);
-    setShameOpen(false);
-    setCompletedMinutes(minutes);
-    setScreen("complete");
-    setMascotState("idle");
-    alertCooldownRef.current = false;
-  }, [minutes, stop]);
+  const { speakAlertOnce, stop: stopSpeech } = useSpeechSynthesis();
+  const { playLoop, stopLoop } = useSirenSound();
+  const { playClick } = useUIClick();
 
-  const dismissShame = () => {
-    setShameOpen(false);
-    setMascotState("looking");
-    stop();
-  };
-
-  const resetApp = () => {
-    setScreen("home");
-    setMinutes(DEFAULT_MINUTES);
-    setSecondsLeft(0);
-    setViolations(0);
-    setMascotState("idle");
-  };
+  const lockInEnabled = isValidMinutesInput(minutesInput);
 
   useEffect(() => {
-    if (screen !== "active") return;
+    sessionStateRef.current = sessionState;
+  }, [sessionState]);
 
-    const id = window.setInterval(() => {
+  const clearSequenceTimers = useCallback(() => {
+    sequenceTimersRef.current.forEach((id) => window.clearTimeout(id));
+    sequenceTimersRef.current = [];
+  }, []);
+
+  const schedule = useCallback((fn: () => void, ms: number) => {
+    const id = window.setTimeout(fn, ms);
+    sequenceTimersRef.current.push(id);
+    return id;
+  }, []);
+
+  const stopAllEffects = useCallback(() => {
+    stopLoop();
+    stopSpeech();
+  }, [stopLoop, stopSpeech]);
+
+  const playAlertAudio = useCallback(() => {
+    playClick();
+    void speakAlertOnce();
+  }, [playClick, speakAlertOnce]);
+
+  const clearWarningTimer = useCallback(() => {
+    if (warningTimerRef.current) {
+      clearTimeout(warningTimerRef.current);
+      warningTimerRef.current = null;
+    }
+  }, []);
+
+  const enterLockedIn = useCallback(() => {
+    clearWarningTimer();
+    setTopToastVisible(false);
+    setSessionState("LOCKED_IN");
+    setSurveillancePhase("live");
+  }, [clearWarningTimer]);
+
+  const enterAlertRef = useRef<() => void>(() => undefined);
+  const enterLockedInRef = useRef<() => void>(() => undefined);
+  enterLockedInRef.current = enterLockedIn;
+
+  const resetDetectionRef = useRef<() => void>(() => undefined);
+
+  const enterAlert = useCallback(() => {
+    clearWarningTimer();
+    setTopToastVisible(false);
+
+    const message = pickAlertMessage(lastAlertMessageRef.current);
+    lastAlertMessageRef.current = message;
+    setAlertMessage(message);
+
+    setSessionState("ALERT");
+    setSurveillancePhase("snapshot");
+    playAlertAudio();
+
+    schedule(() => setSurveillancePhase("darken"), SURVEILLANCE_FREEZE_MS);
+    schedule(() => setSurveillancePhase("live"), SURVEILLANCE_RESUME_MS);
+  }, [clearWarningTimer, playAlertAudio, schedule]);
+
+  enterAlertRef.current = enterAlert;
+
+  const enterPhoneWarning = useCallback(() => {
+    if (sessionStateRef.current !== "LOCKED_IN") return;
+
+    setSessionState("PHONE_WARNING");
+    setTopToastVisible(true);
+
+    clearWarningTimer();
+    warningTimerRef.current = setTimeout(() => {
+      warningTimerRef.current = null;
+      if (phoneStillVisibleRef.current) {
+        enterAlertRef.current();
+      } else {
+        resetDetectionRef.current();
+        enterLockedInRef.current();
+      }
+    }, PHONE_WARNING_DURATION_MS);
+  }, [clearWarningTimer]);
+
+  const detectionEnabled =
+    sessionState === "LOCKED_IN" || sessionState === "PHONE_WARNING";
+
+  const { resetDetection, isPhoneVisible } = usePhoneObjectDetection({
+    video: detectionVideo,
+    enabled: detectionEnabled,
+    onDebug: setDetectionDebug,
+    onPhoneSustained: enterPhoneWarning,
+    onPhoneLost: () => {
+      if (sessionStateRef.current !== "PHONE_WARNING") return;
+      clearWarningTimer();
+      setTopToastVisible(false);
+      resetDetectionRef.current();
+      enterLockedInRef.current();
+    },
+  });
+
+  resetDetectionRef.current = resetDetection;
+
+  useEffect(() => {
+    phoneStillVisibleRef.current = isPhoneVisible();
+  });
+
+  const beginRecovery = useCallback(() => {
+    stopAllEffects();
+    clearWarningTimer();
+    clearSequenceTimers();
+    setTopToastVisible(false);
+    setSurveillancePhase("live");
+    setSessionState("RECOVERY");
+    setBottomToastMessage("Back on duty");
+    setBottomToastVisible(true);
+
+    if (recoveryTimerRef.current) clearTimeout(recoveryTimerRef.current);
+    recoveryTimerRef.current = setTimeout(() => {
+      recoveryTimerRef.current = null;
+      setBottomToastVisible(false);
+      resetDetection();
+      enterLockedIn();
+    }, RECOVERY_DURATION_MS);
+  }, [
+    stopAllEffects,
+    clearWarningTimer,
+    clearSequenceTimers,
+    resetDetection,
+    enterLockedIn,
+  ]);
+
+  const backToWork = useCallback(() => {
+    if (sessionStateRef.current !== "ALERT") return;
+    beginRecovery();
+  }, [beginRecovery]);
+
+  const handleVideoReady = useCallback((video: HTMLVideoElement | null) => {
+    setDetectionVideo(video);
+    setStreamReady(!!video);
+  }, []);
+
+  const startSession = () => {
+    if (!lockInEnabled) return;
+    const m = parseMinutesInput(minutesInput);
+    setSecondsLeft(m * 60);
+    stopAllEffects();
+    clearWarningTimer();
+    clearSequenceTimers();
+    if (recoveryTimerRef.current) clearTimeout(recoveryTimerRef.current);
+    resetDetection();
+    setTopToastVisible(false);
+    setBottomToastVisible(false);
+    setSurveillancePhase("live");
+    setJustLocked(true);
+    setSessionState("LOCKED_IN");
+    window.setTimeout(() => setJustLocked(false), 520);
+  };
+
+  const stopSession = useCallback(() => {
+    stopAllEffects();
+    clearWarningTimer();
+    clearSequenceTimers();
+    if (recoveryTimerRef.current) clearTimeout(recoveryTimerRef.current);
+    resetDetection();
+    setTopToastVisible(false);
+    setBottomToastVisible(false);
+    setSurveillancePhase("live");
+    setSecondsLeft(0);
+    setSessionState("IDLE");
+  }, [stopAllEffects, clearWarningTimer, clearSequenceTimers, resetDetection]);
+
+  useEffect(() => {
+    if (sessionState !== "LOCKED_IN") return;
+    const id = setInterval(() => {
       setSecondsLeft((s) => {
         if (s <= 1) {
-          endSession();
+          stopSession();
           return 0;
         }
         return s - 1;
       });
     }, 1000);
+    return () => clearInterval(id);
+  }, [sessionState, stopSession]);
 
-    return () => window.clearInterval(id);
-  }, [screen, endSession]);
+  useEffect(() => {
+    return () => {
+      clearSequenceTimers();
+      clearWarningTimer();
+      if (recoveryTimerRef.current) clearTimeout(recoveryTimerRef.current);
+    };
+  }, [clearSequenceTimers, clearWarningTimer]);
 
-  const focusScore = computeFocusScore(totalSecondsRef.current, violations);
+  const isLanding = sessionState === "IDLE";
+  const isActive = sessionState !== "IDLE";
+  const alertOpen = sessionState === "ALERT";
+  const phoneWarning = sessionState === "PHONE_WARNING";
 
-  if (screen === "complete") {
-    return (
-      <SessionComplete
-        minutes={completedMinutes}
-        violations={violations}
-        focusScore={focusScore}
-        onLockInAgain={resetApp}
-      />
-    );
-  }
+  const cameraState: CameraState = useMemo(() => {
+    if (sessionState === "RECOVERY") return "recovered";
+    if (sessionState === "ALERT") return "alert";
+    if (sessionState === "PHONE_WARNING") return "phone-found";
+    if (sessionState === "LOCKED_IN") return "active";
+    return "ready";
+  }, [sessionState]);
 
-  const isActive = screen === "active";
+  const officerVariant: OfficerVariant = useMemo(() => {
+    if (sessionState === "ALERT") return "alert";
+    if (sessionState === "RECOVERY") return "recovered";
+    if (sessionState === "PHONE_WARNING") return "watching";
+    return "idle";
+  }, [sessionState]);
+
+  useEffect(() => {
+    if (!alertOpen) return;
+
+    playLoop();
+    document.body.classList.add("siren-ambient-active");
+    document.documentElement.classList.add("siren-ambient-active");
+
+    return () => {
+      stopLoop();
+      document.body.classList.remove("siren-ambient-active");
+      document.documentElement.classList.remove("siren-ambient-active");
+    };
+  }, [alertOpen, playLoop, stopLoop]);
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-surface">
-      <AmbientBackground active={isActive} />
-
-      <div className="relative z-10 mx-auto flex min-h-screen max-w-7xl flex-col px-5 py-8 sm:px-10 sm:py-10">
-        <header className="flex flex-col items-center gap-3 text-center">
-          <motion.h1
-            className="text-4xl font-black uppercase tracking-[0.12em] text-warm-white sm:text-6xl md:text-7xl"
-            initial={{ opacity: 0, y: -12 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            Lock-In Police
-          </motion.h1>
-          <LiveIndicator size={isActive ? "md" : "sm"} />
+    <div className="page-grain relative min-h-screen bg-canvas text-text">
+      <div className="dashboard-page">
+        <header
+          className={`fade-in dashboard-header ${isActive ? "dashboard-header--active" : ""}`}
+        >
+          <h1 className="dashboard-headline font-extrabold text-text">
+            Lock-in Police
+          </h1>
         </header>
 
-        {isActive && (
-          <motion.p
-            className="mt-4 text-center text-xs font-bold uppercase tracking-[0.45em] text-warm-white/35"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            Don&apos;t touch it
-          </motion.p>
-        )}
+        <main className="fade-in-delayed dashboard-shell">
+          <section className="dashboard-camera">
+            <CameraPreview
+              sessionActive={isActive}
+              streamReady={streamReady}
+              cameraState={cameraState}
+              surveillancePhase={surveillancePhase}
+              phoneWarning={phoneWarning}
+              onVideoReady={handleVideoReady}
+            />
+          </section>
 
-        <main className="mt-8 flex flex-1 flex-col gap-8 lg:mt-10 lg:flex-row lg:items-stretch lg:gap-12">
-          <div className="flex-1 lg:max-w-[58%]">
-            <CameraPreview active={isActive} className="h-full" />
-          </div>
+          <aside className="dashboard-rail">
+            <FocusTimerCard
+              isLanding={isLanding}
+              isActive={isActive}
+              justLocked={justLocked}
+              minutesInput={minutesInput}
+              secondsLeft={secondsLeft}
+              lockInEnabled={lockInEnabled}
+              onMinutesInputChange={setMinutesInput}
+              onLockIn={startSession}
+              onStopSession={stopSession}
+            />
 
-          <div className="flex flex-1 flex-col justify-center lg:max-w-[42%]">
-            {isActive ? (
-              <ActivePanel
-                secondsLeft={secondsLeft}
-                mascotState={mascotState}
-                onSimulate={simulate}
-              />
-            ) : (
-              <HomePanel
-                minutes={minutes}
-                onMinutesChange={setMinutes}
-                onLockIn={startSession}
-              />
-            )}
-          </div>
+            <BentoCard className="police-card">
+              <div className="police-card__officer">
+                <PoliceMascot variant={officerVariant} />
+              </div>
+            </BentoCard>
+          </aside>
         </main>
-      </div>
 
-      <AlertModal open={alertOpen} />
-      <ShameDispatch
-        open={shameOpen}
-        message={shameMessage}
-        onBackToWork={dismissShame}
-        onStopSession={endSession}
-      />
-    </div>
-  );
-}
-
-function AmbientBackground({ active }: { active: boolean }) {
-  return (
-    <>
-      <motion.div
-        className="pointer-events-none absolute -left-32 top-20 h-96 w-96 rounded-full bg-accent/8 blur-[120px]"
-        animate={{ x: active ? [0, 30, 0] : 0, y: active ? [0, -20, 0] : 0 }}
-        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-      />
-      <motion.div
-        className="pointer-events-none absolute -right-24 bottom-20 h-80 w-80 rounded-full bg-warning/6 blur-[100px]"
-        animate={{ x: active ? [0, -25, 0] : 0 }}
-        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-      />
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.03]"
-        style={{
-          backgroundImage:
-            "radial-gradient(circle at 1px 1px, white 1px, transparent 0)",
-          backgroundSize: "32px 32px",
-        }}
-      />
-    </>
-  );
-}
-
-function HomePanel({
-  minutes,
-  onMinutesChange,
-  onLockIn,
-}: {
-  minutes: number;
-  onMinutesChange: (n: number) => void;
-  onLockIn: () => void;
-}) {
-  return (
-    <motion.div
-      className="flex flex-col gap-8"
-      initial={{ opacity: 0, x: 24 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ type: "spring", stiffness: 120, damping: 22 }}
-    >
-      <div>
-        <label
-          htmlFor="minutes"
-          className="text-[10px] font-bold uppercase tracking-[0.4em] text-warm-white/35"
-        >
-          Minutes
-        </label>
-        <input
-          id="minutes"
-          type="number"
-          min={1}
-          max={180}
-          value={minutes}
-          onChange={(e) =>
-            onMinutesChange(Math.max(1, parseInt(e.target.value, 10) || 1))
-          }
-          className="glass mt-3 w-full rounded-card border-0 bg-transparent px-6 py-5 text-5xl font-light text-warm-white outline-none ring-0 focus:ring-2 focus:ring-accent/40"
+        <AlertMode
+          open={alertOpen}
+          alertMessage={alertMessage}
+          onBackToWork={backToWork}
+          onStopSession={stopSession}
         />
       </div>
 
-      <motion.button
-        type="button"
-        onClick={onLockIn}
-        className="w-full rounded-card bg-cream py-6 text-sm font-black uppercase tracking-[0.3em] text-surface shadow-[0_0_60px_rgba(245,240,232,0.15)]"
-        whileHover={{ scale: 1.02, boxShadow: "0 0 80px rgba(245,240,232,0.25)" }}
-        whileTap={{ scale: 0.98 }}
-      >
-        Lock In
-      </motion.button>
+      <TopToast message="Phone found" visible={topToastVisible} />
+      <Toast message={bottomToastMessage} visible={bottomToastVisible} />
 
-      <div className="flex justify-center pt-2">
-        <PoliceMascot state="idle" size="md" />
-      </div>
-    </motion.div>
-  );
-}
-
-function ActivePanel({
-  secondsLeft,
-  mascotState,
-  onSimulate,
-}: {
-  secondsLeft: number;
-  mascotState: MascotState;
-  onSimulate: () => void;
-}) {
-  return (
-    <motion.div
-      className="flex flex-col items-center gap-6 text-center lg:items-start lg:text-left"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-    >
-      <p className="text-[10px] font-bold uppercase tracking-[0.45em] text-warm-white/35">
-        Focus Timer
-      </p>
-      <motion.p
-        className="text-7xl font-black tabular-nums tracking-tight text-warm-white sm:text-8xl md:text-9xl"
-        key={secondsLeft}
-        initial={{ scale: 1.02 }}
-        animate={{ scale: 1 }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      >
-        {formatTimerDisplay(secondsLeft)}
-      </motion.p>
-
-      <div className="flex w-full flex-col items-center gap-6 lg:items-start">
-        <PoliceMascot state={mascotState} size="md" />
-        <motion.button
-          type="button"
-          onClick={onSimulate}
-          className="text-[10px] font-semibold uppercase tracking-[0.25em] text-warm-white/25 underline-offset-4 transition hover:text-warm-white/50 hover:underline"
-        >
-          Simulate phone pickup
-        </motion.button>
-      </div>
-    </motion.div>
+      <DebugPanel
+        state={sessionState}
+        phone={detectionDebug.phone}
+        confidence={detectionDebug.confidence}
+        alert={alertOpen}
+        recovery={sessionState === "RECOVERY"}
+      />
+    </div>
   );
 }

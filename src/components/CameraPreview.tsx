@@ -1,93 +1,189 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
+import type { CameraState, SurveillancePhase } from "@/lib/types";
 
-type Props = {
-  active?: boolean;
-  className?: string;
+type CameraPreviewProps = {
+  sessionActive?: boolean;
+  streamReady?: boolean;
+  cameraState?: CameraState;
+  surveillancePhase?: SurveillancePhase;
+  phoneWarning?: boolean;
+  onVideoReady?: (video: HTMLVideoElement | null) => void;
 };
 
-export function CameraPreview({ active = false, className = "" }: Props) {
+function CameraPreviewInner({
+  sessionActive = false,
+  streamReady = false,
+  cameraState = "ready",
+  surveillancePhase = "live",
+  phoneWarning = false,
+  onVideoReady,
+}: CameraPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
-  const [error, setError] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
+  const [snapshotReady, setSnapshotReady] = useState(false);
+  const [localReady, setLocalReady] = useState(false);
+
+  const showSnapshot =
+    surveillancePhase === "snapshot" || surveillancePhase === "darken";
+  const showLiveVideo = surveillancePhase === "live" && !showSnapshot;
+
+  const resolvedState: CameraState = phoneWarning
+    ? "phone-found"
+    : cameraState;
+
+  const liveLabel =
+    resolvedState === "phone-found"
+      ? "Phone found"
+      : resolvedState === "alert"
+        ? "Alert"
+        : resolvedState === "recovered"
+          ? "Live"
+          : sessionActive
+            ? "Live"
+            : localReady
+              ? "Live"
+              : "Ready";
+
+  useEffect(() => {
+    onVideoReady?.(videoRef.current);
+  }, [onVideoReady, unavailable, localReady]);
 
   useEffect(() => {
     let mounted = true;
-    let localStream: MediaStream | null = null;
 
-    async function init() {
+    (async () => {
       try {
-        localStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+        const local = await navigator.mediaDevices.getUserMedia({
+          video: true,
           audio: false,
         });
         if (!mounted) {
-          localStream.getTracks().forEach((t) => t.stop());
+          local.getTracks().forEach((t) => t.stop());
           return;
         }
-        setStream(localStream);
-        setError(false);
+        streamRef.current = local;
+        const video = videoRef.current;
+        if (video) {
+          video.srcObject = local;
+          await video.play().catch(() => undefined);
+          setLocalReady(true);
+          onVideoReady?.(video);
+        }
+        setUnavailable(false);
       } catch {
-        if (mounted) setError(true);
+        if (mounted) {
+          setUnavailable(true);
+          setLocalReady(false);
+        }
+        onVideoReady?.(null);
       }
-    }
-
-    init();
+    })();
 
     return () => {
       mounted = false;
-      localStream?.getTracks().forEach((t) => t.stop());
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      setLocalReady(false);
+      onVideoReady?.(null);
     };
-  }, []);
+  }, [onVideoReady]);
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !stream) return;
-    video.srcObject = stream;
-  }, [stream]);
+    if (!video || !streamRef.current) return;
+    if (video.srcObject !== streamRef.current) {
+      video.srcObject = streamRef.current;
+    }
+    if (showLiveVideo) {
+      void video.play().catch(() => undefined);
+    } else if (surveillancePhase === "snapshot") {
+      video.pause();
+    }
+  }, [showLiveVideo, surveillancePhase]);
+
+  useEffect(() => {
+    if (surveillancePhase !== "snapshot") {
+      setSnapshotReady(false);
+      return;
+    }
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || video.readyState < 2) return;
+
+    const w = video.videoWidth || video.clientWidth;
+    const h = video.videoHeight || video.clientHeight;
+    if (w === 0 || h === 0) return;
+
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    try {
+      ctx.drawImage(video, 0, 0, w, h);
+      setSnapshotReady(true);
+      video.pause();
+    } catch {
+      setSnapshotReady(false);
+    }
+  }, [surveillancePhase]);
 
   return (
-    <motion.div
-      className={`glass scanlines relative overflow-hidden rounded-card ${className}`}
-      initial={{ opacity: 0, scale: 0.96 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ type: "spring", stiffness: 120, damping: 20 }}
+    <div
+      className={`camera-shell glass-card camera-shell--${resolvedState} ${
+        sessionActive ? "camera-shell--session" : ""
+      } ${streamReady || localReady ? "camera-shell--stream-ready" : ""}`}
     >
-      <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-full bg-black/50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-warm-white/80">
-        <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
-        Surveillance Feed
+      <div className="camera-shell__header">
+        <span className="text-[14px] font-semibold leading-[18px] text-muted">
+          Camera Feed
+        </span>
+        <div className="camera-live-tag flex items-center gap-1">
+          <span className="live-dot h-2 w-2 rounded-full bg-accent" />
+          <span className="camera-live-tag__text text-[12px] font-bold uppercase leading-[18px] text-accent">
+            {liveLabel}
+          </span>
+        </div>
       </div>
 
-      {active && (
-        <motion.div
-          className="absolute inset-0 z-[5] pointer-events-none border-2 border-accent/30"
-          animate={{ opacity: [0.2, 0.5, 0.2] }}
-          transition={{ duration: 2, repeat: Infinity }}
+      <div className="camera-shell__feed camera-vignette camera-grain">
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className={`camera-shell__video ${
+            showLiveVideo
+              ? "camera-shell__video--visible"
+              : "camera-shell__video--hidden"
+          }`}
         />
-      )}
 
-      <div className="relative aspect-[4/3] w-full min-h-[280px] bg-black/60 md:min-h-[360px]">
-        {!error && stream ? (
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="h-full w-full object-cover scale-x-[-1]"
-          />
-        ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-gradient-to-br from-white/5 to-transparent p-8 text-center">
-            <span className="text-5xl opacity-60">📹</span>
-            <p className="text-sm uppercase tracking-[0.2em] text-warm-white/40">
-              Camera offline — officer on desk duty
+        <canvas
+          ref={canvasRef}
+          className={`camera-shell__snapshot ${
+            showSnapshot && snapshotReady
+              ? "camera-shell__snapshot--visible"
+              : ""
+          } ${surveillancePhase === "darken" ? "camera-shell__snapshot--darken" : ""}`}
+          aria-hidden
+        />
+
+        {unavailable && (
+          <div className="camera-shell__placeholder" aria-live="polite">
+            <p className="text-[12px] font-bold uppercase tracking-[0.15em] text-muted">
+              Enable Camera
             </p>
           </div>
         )}
       </div>
-
-      <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-surface/90 to-transparent" />
-    </motion.div>
+    </div>
   );
 }
+
+export const CameraPreview = memo(CameraPreviewInner);

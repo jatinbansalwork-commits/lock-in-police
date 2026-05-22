@@ -1,5 +1,5 @@
-import { LockInPolice } from "@/components/LockInPolice";
+import { LockInPoliceApp } from "@/components/LockInPoliceApp";
 
 export default function Home() {
-  return <LockInPolice />;
+  return <LockInPoliceApp />;
 }

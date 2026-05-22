@@ -1,9 +1,22 @@
-export type AppScreen = "home" | "active" | "complete";
+export type SessionState =
+  | "IDLE"
+  | "LOCKED_IN"
+  | "PHONE_WARNING"
+  | "ALERT"
+  | "RECOVERY";
 
-export type MascotState = "idle" | "looking" | "angry" | "siren";
+export type OfficerVariant = "idle" | "watching" | "alert" | "recovered";
 
-export type DistractionSource =
-  | "tab-hidden"
-  | "simulate"
-  | "random"
-  | "mouse-idle";
+export type CameraState =
+  | "ready"
+  | "active"
+  | "phone-found"
+  | "alert"
+  | "recovered";
+
+export type SurveillancePhase = "live" | "snapshot" | "darken";
+
+export type DetectionDebug = {
+  phone: boolean;
+  confidence: number;
+};

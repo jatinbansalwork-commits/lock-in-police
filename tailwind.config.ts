@@ -1,49 +1,40 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
-  content: [
-    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
-  ],
+  content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
   theme: {
     extend: {
       colors: {
-        surface: "#0B0B0D",
-        cream: "#F5F0E8",
-        accent: "#FF6B6B",
-        warning: "#E53935",
-        "warm-white": "#F8F4EF",
-      },
-      borderRadius: {
-        card: "28px",
+        canvas: "#161C24",
+        card: "#202834",
+        "card-inner": "#161C24",
+        text: "#FFFFFF",
+        muted: "#919EAB",
+        accent: "#FF5630",
+        "input-bg": "rgba(145, 158, 171, 0.16)",
       },
       fontFamily: {
-        display: ["var(--font-display)", "system-ui", "sans-serif"],
+        sans: ["var(--font-public-sans)", "system-ui", "sans-serif"],
       },
-      animation: {
-        breathe: "breathe 3s ease-in-out infinite",
-        "siren-red": "sirenFlash 0.4s ease-in-out infinite alternate",
-        "siren-blue": "sirenFlashBlue 0.4s ease-in-out infinite alternate-reverse",
-        float: "float 4s ease-in-out infinite",
+      fontSize: {
+        "display-h1": ["64px", { lineHeight: "80px", letterSpacing: "0" }],
+        "display-h2": ["48px", { lineHeight: "64px", letterSpacing: "0" }],
+        timer: ["48px", { lineHeight: "64px", letterSpacing: "0" }],
       },
-      keyframes: {
-        breathe: {
-          "0%, 100%": { transform: "scale(1)" },
-          "50%": { transform: "scale(1.06)" },
-        },
-        sirenFlash: {
-          "0%": { opacity: "0.15" },
-          "100%": { opacity: "0.55" },
-        },
-        sirenFlashBlue: {
-          "0%": { opacity: "0.1" },
-          "100%": { opacity: "0.45" },
-        },
-        float: {
-          "0%, 100%": { transform: "translateY(0px)" },
-          "50%": { transform: "translateY(-8px)" },
-        },
+      maxWidth: {
+        canvas: "1440px",
+        bento: "983px",
+      },
+      borderRadius: {
+        card: "24px",
+        inner: "18px",
+        control: "8px",
+      },
+      backgroundImage: {
+        "btn-lock-in":
+          "linear-gradient(150.49deg, #FFAC82 0%, #FF5630 100%)",
+        "btn-primary":
+          "linear-gradient(160.24deg, #C3DAF4 0%, #1C5EA4 100%)",
       },
     },
   },

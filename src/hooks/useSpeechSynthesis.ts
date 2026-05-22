@@ -1,46 +1,72 @@
 "use client";
 
 import { useCallback, useRef } from "react";
-import { VOICE_LINES } from "@/lib/constants";
+import { ALERT_VOICE_LINES } from "@/lib/constants";
+
+function pickRoboticVoice(): SpeechSynthesisVoice | null {
+  const voices = window.speechSynthesis?.getVoices() ?? [];
+  const preferred = voices.find(
+    (v) =>
+      v.lang.startsWith("en") &&
+      (v.name.includes("Fred") ||
+        v.name.includes("Daniel") ||
+        v.name.includes("Google UK English Male") ||
+        v.name.includes("Male"))
+  );
+  return preferred ?? voices.find((v) => v.lang.startsWith("en")) ?? null;
+}
 
 export function useSpeechSynthesis() {
-  const speakingRef = useRef(false);
+  const busyRef = useRef(false);
+  const stopRef = useRef(false);
 
-  const speakLines = useCallback(async () => {
-    if (typeof window === "undefined" || !window.speechSynthesis) return;
-    if (speakingRef.current) return;
+  const speakOne = useCallback((line: string) => {
+    return new Promise<void>((resolve) => {
+      if (!window.speechSynthesis || stopRef.current) {
+        resolve();
+        return;
+      }
+      const u = new SpeechSynthesisUtterance(line);
+      u.rate = 0.72;
+      u.pitch = 0.35;
+      u.volume = 1;
+      const voice = pickRoboticVoice();
+      if (voice) u.voice = voice;
+      u.onend = () => resolve();
+      u.onerror = () => resolve();
+      window.speechSynthesis.speak(u);
+    });
+  }, []);
 
-    speakingRef.current = true;
+  /** Speak alert lines once — no loop */
+  const speakAlertOnce = useCallback(async () => {
+    if (!window.speechSynthesis || busyRef.current) return;
+    busyRef.current = true;
+    stopRef.current = false;
     window.speechSynthesis.cancel();
 
-    for (const line of VOICE_LINES) {
+    if (window.speechSynthesis.getVoices().length === 0) {
       await new Promise<void>((resolve) => {
-        const utterance = new SpeechSynthesisUtterance(line);
-        utterance.rate = 0.95;
-        utterance.pitch = 0.85;
-        utterance.volume = 1;
-        const voices = window.speechSynthesis.getVoices();
-        const preferred =
-          voices.find((v) => v.name.includes("Samantha")) ??
-          voices.find((v) => v.lang.startsWith("en")) ??
-          voices[0];
-        if (preferred) utterance.voice = preferred;
-        utterance.onend = () => resolve();
-        utterance.onerror = () => resolve();
-        window.speechSynthesis.speak(utterance);
+        window.speechSynthesis.onvoiceschanged = () => resolve();
+        setTimeout(resolve, 200);
       });
-      await new Promise((r) => setTimeout(r, 280));
     }
 
-    speakingRef.current = false;
-  }, []);
+    for (const line of ALERT_VOICE_LINES) {
+      if (stopRef.current) break;
+      await speakOne(line);
+      if (stopRef.current) break;
+      await new Promise((r) => setTimeout(r, 300));
+    }
+
+    busyRef.current = false;
+  }, [speakOne]);
 
   const stop = useCallback(() => {
-    if (typeof window !== "undefined") {
-      window.speechSynthesis?.cancel();
-    }
-    speakingRef.current = false;
+    stopRef.current = true;
+    window.speechSynthesis?.cancel();
+    busyRef.current = false;
   }, []);
 
-  return { speakLines, stop };
+  return { speakAlertOnce, stop };
 }
