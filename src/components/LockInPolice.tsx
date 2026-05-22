@@ -635,7 +635,7 @@ export function LockInPolice() {
 
     document.body.classList.add("alert-era-active");
     document.documentElement.classList.add("alert-era-active");
-    playLoop(sirenIntensity, sirenVolumeScale(violationCount));
+    void playLoop(sirenIntensity, sirenVolumeScale(violationCount));
     applySirenAmbientClasses(violationCount);
 
     return () => {

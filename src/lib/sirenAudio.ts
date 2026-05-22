@@ -60,6 +60,7 @@ function buildSirenSamples(sampleRate: number, durationSec: number): Int16Array 
 }
 
 export function getSirenAudioUrl(): string {
+  if (typeof window === "undefined") return "";
   if (cachedUrl) return cachedUrl;
   const sampleRate = 22050;
   const samples = buildSirenSamples(sampleRate, 2.4);
