@@ -8,6 +8,7 @@ import { MAX_MINUTES, MIN_MINUTES } from "@/lib/constants";
 type FocusTimerCardProps = {
   isLanding: boolean;
   isActive: boolean;
+  timerPaused?: boolean;
   justLocked: boolean;
   minutesInput: string;
   secondsLeft: number;
@@ -20,6 +21,7 @@ type FocusTimerCardProps = {
 function FocusTimerCardInner({
   isLanding,
   isActive,
+  timerPaused = false,
   justLocked,
   minutesInput,
   secondsLeft,
@@ -30,9 +32,9 @@ function FocusTimerCardInner({
 }: FocusTimerCardProps) {
   return (
     <BentoCard
-      className={`timer-card ${isActive ? "timer-card--locked" : ""} ${
-        justLocked ? "timer-card--lock-pulse" : ""
-      }`}
+      className={`timer-card glass-card--elev-medium ${isActive ? "timer-card--locked" : ""} ${
+        timerPaused ? "timer-card--paused" : ""
+      } ${justLocked ? "timer-card--lock-pulse" : ""}`}
     >
       <p className="timer-card__label">Don&apos;t touch it</p>
 

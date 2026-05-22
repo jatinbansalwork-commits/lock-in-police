@@ -8,6 +8,17 @@
   --muted: #919eab;
   --accent: #ff5630;
   --card: #202834;
+  --m3-surface: #202834;
+  --m3-surface-container: rgba(32, 40, 52, 0.94);
+  --m3-on-surface: #ffffff;
+  --m3-on-surface-variant: #919eab;
+  --m3-primary: #1c5ea4;
+  --m3-outline: rgba(145, 158, 171, 0.32);
+  --m3-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.28), 0 2px 6px rgba(0, 0, 0, 0.18);
+  --m3-elevation-2: 0 4px 12px rgba(0, 0, 0, 0.32), 0 8px 24px rgba(0, 0, 0, 0.22);
+  --motion-short: 200ms;
+  --motion-medium: 280ms;
+  --motion-emphasis: 350ms;
 }
 
 html,
@@ -353,6 +364,7 @@ body {
 }
 
 .dashboard-camera {
+  position: relative;
   width: 100%;
   min-width: 0;
 }
@@ -377,14 +389,14 @@ body {
   width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 24px;
-  background: rgba(32, 40, 52, 0.72);
+  background: color-mix(in srgb, var(--m3-surface) 88%, transparent);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    inset 0 -12px 24px rgba(0, 0, 0, 0.22),
-    0 0 0 1px rgba(28, 94, 164, 0.14),
-    0 12px 40px rgba(28, 94, 164, 0.08);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    var(--m3-elevation-1);
+  transition:
+    transform var(--motion-short) ease,
+    box-shadow var(--motion-medium) ease;
   transform: translateZ(0);
   box-sizing: border-box;
 }
@@ -397,24 +409,44 @@ body {
     0 14px 44px rgba(28, 94, 164, 0.12);
 }
 
-/* —— Camera (fixed 560px) —— */
+/* —— Card elevation (M3 depth, no glow) —— */
+.glass-card--elev-high {
+  background: color-mix(in srgb, var(--m3-surface) 94%, #263040);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 2px 4px rgba(0, 0, 0, 0.28),
+    0 10px 28px rgba(0, 0, 0, 0.32);
+}
+
+.glass-card--elev-medium {
+  background: color-mix(in srgb, var(--m3-surface) 90%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 2px 6px rgba(0, 0, 0, 0.22),
+    0 6px 18px rgba(0, 0, 0, 0.2);
+}
+
+.glass-card--elev-low {
+  background: color-mix(in srgb, var(--m3-surface) 84%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 1px 3px rgba(0, 0, 0, 0.18),
+    0 4px 12px rgba(0, 0, 0, 0.16);
+}
+
+/* —— Camera (584px = timer + gap + police, ±12px optical match) —— */
 .camera-shell {
   position: relative;
-  height: 560px;
-  min-height: 560px;
-  max-height: 560px;
+  height: 584px;
+  min-height: 584px;
+  max-height: 584px;
   overflow: hidden;
   padding: 16px;
   border-radius: 28px;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  transition: box-shadow 280ms ease, border-color 280ms ease;
+  transition:
+    box-shadow var(--motion-medium) ease,
+    border-color var(--motion-medium) ease;
   border: 1px solid rgba(28, 94, 164, 0.28);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    inset 0 -12px 24px rgba(0, 0, 0, 0.22),
-    0 0 0 1px rgba(28, 94, 164, 0.18),
-    0 12px 40px rgba(28, 94, 164, 0.1);
 }
 
 .camera-shell--session .camera-shell__feed {
@@ -425,23 +457,35 @@ body {
   border-color: rgba(28, 94, 164, 0.38);
 }
 
-.camera-shell--phone-found {
-  border-color: rgba(255, 138, 72, 0.88);
+.camera-shell--phone-suspected,
+.camera-shell--suspected-ambient {
+  border-color: rgba(255, 160, 96, 0.55);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    0 0 0 1px rgba(255, 138, 72, 0.5),
-    0 0 28px rgba(255, 138, 72, 0.16);
+    0 0 0 1px rgba(255, 160, 96, 0.28),
+    0 0 20px rgba(255, 160, 96, 0.1);
 }
 
-.camera-shell--phone-found .camera-shell__feed {
-  box-shadow: inset 0 0 40px rgba(255, 138, 72, 0.08);
+.camera-shell--phone-suspected .camera-live-tag__text,
+.camera-shell--suspected-ambient .camera-live-tag__text {
+  color: #ffb07a;
 }
 
-.camera-shell--phone-found .camera-live-tag__text {
-  color: #ff8a48;
+.camera-shell--confidence-low {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 0 0 1px rgba(70, 120, 255, 0.22),
+    0 0 16px rgba(70, 120, 255, 0.08);
 }
 
-.camera-shell--phone-found .live-dot {
-  background-color: #ff8a48 !important;
+.camera-shell--confidence-medium {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 0 0 1px rgba(70, 120, 255, 0.38),
+    0 0 28px rgba(70, 120, 255, 0.14);
+}
+
+.camera-shell--confidence-high {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 0 0 1px rgba(255, 138, 72, 0.55),
+    0 0 36px rgba(255, 100, 72, 0.22);
 }
 
 .camera-shell--alert {
@@ -473,15 +517,63 @@ body {
 .camera-shell__header {
   display: flex;
   flex-shrink: 0;
-  height: 24px;
-  align-items: center;
+  min-height: 24px;
+  align-items: flex-start;
   justify-content: space-between;
   margin-bottom: 12px;
 }
 
+.camera-shell__title-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.camera-shell__title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--muted);
+}
+
+.camera-shell__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.camera-shell__status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.camera-shell__status--locked-in {
+  color: rgba(28, 94, 164, 0.95);
+}
+
+.camera-shell__status--locked-in .camera-shell__status-dot {
+  background: rgba(28, 94, 164, 0.95);
+}
+
+.camera-shell__status--phone-found {
+  color: rgba(255, 86, 48, 0.95);
+}
+
+.camera-shell__status--phone-found .camera-shell__status-dot {
+  background: rgba(255, 86, 48, 0.95);
+}
+
 .camera-shell__feed {
   position: relative;
-  flex: 1;
+  flex: 1 1 0;
   min-height: 0;
   overflow: hidden;
   border-radius: 18px;
@@ -547,7 +639,7 @@ body {
 
 .camera-shell--alert .camera-shell__video,
 .camera-shell--alert .camera-shell__snapshot.camera-shell__snapshot--visible {
-  filter: brightness(0.72) blur(10px) saturate(0.85);
+  filter: brightness(0.65) contrast(1.12) blur(5px) saturate(0.8);
 }
 
 .camera-shell__placeholder {
@@ -636,19 +728,38 @@ body {
   width: 100%;
   height: 48px;
   border: 0;
+  border-bottom: 2px solid rgba(145, 158, 171, 0.35);
+  border-radius: 8px 8px 0 0;
   background: rgba(145, 158, 171, 0.16);
-  border-radius: 10px;
   padding: 0 16px;
   text-align: center;
   font-size: 18px;
   font-weight: 700;
-  color: var(--text);
+  color: var(--m3-on-surface);
   outline: none;
+  transition:
+    background var(--motion-short) ease,
+    border-color var(--motion-short) ease,
+    box-shadow var(--motion-short) ease;
 }
 
 .timer-card__minutes-input::placeholder {
   color: rgba(145, 158, 171, 0.72);
   font-weight: 600;
+}
+
+.timer-card__minutes-input:hover {
+  background: rgba(145, 158, 171, 0.22);
+}
+
+.timer-card__minutes-input:focus {
+  background: rgba(145, 158, 171, 0.24);
+  border-bottom-color: rgba(28, 94, 164, 0.85);
+  box-shadow: 0 0 0 1px rgba(28, 94, 164, 0.35);
+}
+
+.timer-card--paused .timer-card__clock {
+  opacity: 0.72;
 }
 
 .timer-card--lock-pulse {
@@ -683,20 +794,34 @@ body {
   text-transform: uppercase;
   color: var(--text);
   white-space: nowrap;
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  box-shadow: var(--m3-elevation-1);
+  transition:
+    opacity var(--motion-short) ease,
+    transform var(--motion-short) ease,
+    box-shadow var(--motion-short) ease;
+}
+
+.timer-card__lock-btn:hover:not(:disabled) {
+  box-shadow: var(--m3-elevation-2);
+}
+
+.timer-card__lock-btn:active:not(:disabled) {
+  transform: scale(0.98);
+  box-shadow: var(--m3-elevation-1);
 }
 
 .timer-card__lock-btn:disabled {
   opacity: 0.38;
   cursor: not-allowed;
   pointer-events: none;
+  box-shadow: none;
 }
 
 .timer-card__stop-session {
   width: 100%;
   height: 44px;
   border-radius: 8px;
-  border: 1px solid rgba(145, 158, 171, 0.32);
+  border: 1px solid var(--m3-outline);
   background: rgba(32, 40, 52, 0.55);
   font-size: 12px;
   font-weight: 700;
@@ -704,12 +829,24 @@ body {
   text-transform: uppercase;
   color: var(--muted);
   white-space: nowrap;
-  transition: color 0.2s ease, border-color 0.2s ease;
+  box-shadow: var(--m3-elevation-1);
+  transition:
+    color var(--motion-short) ease,
+    border-color var(--motion-short) ease,
+    background var(--motion-short) ease,
+    box-shadow var(--motion-short) ease,
+    transform var(--motion-short) ease;
 }
 
 .timer-card__stop-session:hover {
-  color: rgba(255, 255, 255, 0.88);
-  border-color: rgba(145, 158, 171, 0.5);
+  color: rgba(255, 255, 255, 0.92);
+  border-color: rgba(145, 158, 171, 0.55);
+  background: rgba(40, 48, 60, 0.75);
+  box-shadow: var(--m3-elevation-2);
+}
+
+.timer-card__stop-session:active {
+  transform: scale(0.98);
 }
 
 /* —— Police card (340×240) —— */
@@ -718,11 +855,11 @@ body {
   height: 240px;
   min-height: 240px;
   max-height: 240px;
-  padding: 8px 12px;
+  padding: 6px 12px 10px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   overflow: hidden;
   box-sizing: border-box;
 }
@@ -730,16 +867,53 @@ body {
 .police-card__officer {
   display: flex;
   width: 100%;
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
   align-items: center;
   justify-content: center;
 }
 
+.officer-companion {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--motion-medium) ease;
+}
+
+.officer-companion--mood-calm {
+  transform: scale(1);
+}
+
+.officer-companion--mood-watch {
+  transform: scale(1.03);
+}
+
+.officer-companion--mood-alert {
+  transform: scale(1.06);
+}
+
+.officer-mood-emoji {
+  position: absolute;
+  top: -2px;
+  right: -6px;
+  z-index: 2;
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.88;
+  pointer-events: none;
+}
+
 .officer-asset {
-  height: 155px !important;
+  height: 140px !important;
   width: auto !important;
-  max-height: 170px;
-  max-width: 170px;
+  max-height: 148px;
+  max-width: 148px;
+}
+
+.police-card:has(.session-stats) .officer-asset {
+  max-height: 128px;
+  height: 120px !important;
 }
 
 .camera-vignette::after {
@@ -773,25 +947,11 @@ body {
   animation: liveTagPulse 2.4s ease-in-out infinite;
 }
 
-/* —— Officer companion —— */
-.officer-companion {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 280ms ease, opacity 280ms ease;
-}
-
-.officer-companion--idle {
-  animation: officerBreathe 4.2s ease-in-out infinite;
-}
-
-.officer-companion--watching {
-  animation: officerLookAround 5s ease-in-out infinite;
-}
-
+/* —— Officer companion (scale-only mood, no motion) —— */
+.officer-companion--idle,
+.officer-companion--watching,
 .officer-companion--alert {
-  animation: officerNod 0.35s ease-in-out 2;
+  animation: none;
 }
 
 .officer-companion--recovered::after {
@@ -829,6 +989,33 @@ body.siren-ambient-active {
   overflow: hidden;
 }
 
+html.phone-suspected-ambient::after,
+body.phone-suspected-ambient::after {
+  content: "";
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 30;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at center,
+    rgba(70, 120, 255, 0.08) 0%,
+    transparent 70%
+  );
+  animation: suspectedAmbient 2.4s ease-in-out infinite alternate;
+}
+
+@keyframes suspectedAmbient {
+  0% {
+    opacity: 0.35;
+  }
+  100% {
+    opacity: 0.7;
+  }
+}
+
 body.siren-ambient-active::before {
   content: "";
   position: fixed;
@@ -839,16 +1026,33 @@ body.siren-ambient-active::before {
   z-index: 35;
   pointer-events: none;
   transform: none;
+  opacity: 0.92;
   background: radial-gradient(
     circle at center,
-    rgba(6, 8, 14, 0.22) 0%,
-    transparent 70%
+    rgba(12, 16, 24, 0.18) 0%,
+    transparent 72%
   );
   mix-blend-mode: screen;
-  filter: blur(80px);
-  animation:
-    sirenAmbienceColor 8s ease-in-out infinite,
-    sirenAmbienceBreathe 1.8s ease-in-out infinite alternate;
+  filter: blur(72px);
+  animation: sirenAmbienceColor 8s ease-in-out infinite;
+}
+
+html.recovery-pulse-active::after,
+body.recovery-pulse-active::after {
+  content: "";
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 36;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at center,
+    rgba(48, 180, 120, 0.16) 0%,
+    transparent 68%
+  );
+  animation: recoveryPulse 800ms ease-out both;
 }
 
 /* —— Alert overlay (card only, viewport-fixed) —— */
@@ -880,14 +1084,26 @@ body.siren-ambient-active::before {
   padding: 36px 32px 28px;
   border-radius: 24px;
   border: 1px solid rgba(28, 94, 164, 0.28);
-  background: rgba(32, 40, 52, 0.94);
+  background: var(--m3-surface-container);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
-  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--m3-elevation-2);
   text-align: center;
   animation:
-    alertCardPop 300ms cubic-bezier(0.22, 1, 0.36, 1) both,
-    alertCardAmbientGlow 3.6s ease-in-out infinite alternate;
+    alertCardPop var(--motion-medium) cubic-bezier(0.22, 1, 0.36, 1) both,
+    alertCardBreathe 4s ease-in-out infinite;
+}
+
+.alert-card--violation-2 {
+  box-shadow:
+    var(--m3-elevation-2),
+    0 0 72px rgba(255, 65, 65, 0.1);
+}
+
+.alert-card--violation-3 {
+  box-shadow:
+    var(--m3-elevation-2),
+    0 0 88px rgba(255, 65, 65, 0.14);
 }
 
 .alert-card__siren-wrap {
@@ -953,12 +1169,37 @@ body.siren-ambient-active::before {
   background: linear-gradient(160.24deg, #c3daf4 0%, #1c5ea4 100%);
   color: var(--text);
   border: 0;
+  box-shadow: var(--m3-elevation-1);
+  transition:
+    transform var(--motion-short) ease,
+    box-shadow var(--motion-short) ease;
+}
+
+.alert-card__btn--primary:hover {
+  box-shadow: var(--m3-elevation-2);
+}
+
+.alert-card__btn--primary:active {
+  transform: scale(0.98);
 }
 
 .alert-card__btn--secondary {
   background: transparent;
-  border: 1px solid rgba(145, 158, 171, 0.32);
+  border: 1px solid var(--m3-outline);
   color: var(--muted);
+  transition:
+    color var(--motion-short) ease,
+    border-color var(--motion-short) ease,
+    transform var(--motion-short) ease;
+}
+
+.alert-card__btn--secondary:hover {
+  color: rgba(255, 255, 255, 0.9);
+  border-color: rgba(145, 158, 171, 0.5);
+}
+
+.alert-card__btn--secondary:active {
+  transform: scale(0.98);
 }
 
 /* —— Top toast —— */
@@ -974,84 +1215,286 @@ body.siren-ambient-active::before {
   color: #ff8a48;
 }
 
-/* —— Debug panel (temp) —— */
-.debug-panel {
-  position: fixed;
-  left: 12px;
+.detection-progress {
+  position: absolute;
+  left: 16px;
+  right: 16px;
   bottom: 12px;
-  z-index: 80;
-  border-radius: 8px;
-  border: 1px solid rgba(145, 158, 171, 0.2);
-  background: rgba(12, 16, 22, 0.88);
-  padding: 8px 10px;
-  font-family: ui-monospace, monospace;
-  font-size: 10px;
-  line-height: 1.45;
-  color: rgba(145, 158, 171, 0.95);
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(12, 16, 22, 0.82);
+  border: 1px solid rgba(70, 120, 255, 0.22);
   pointer-events: none;
+  animation: detectionProgressIn var(--motion-medium) ease-out both;
+}
+
+.detection-progress__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(145, 158, 171, 0.95);
+  white-space: nowrap;
+}
+
+.detection-progress__bars {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+  max-width: 120px;
+}
+
+.detection-progress__bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(145, 158, 171, 0.2);
+  transition: background var(--motion-short) ease;
+}
+
+.detection-progress__bar--on {
+  background: linear-gradient(90deg, rgba(70, 120, 255, 0.5), rgba(70, 120, 255, 0.9));
+}
+
+.police-card__caption {
+  flex-shrink: 0;
+  margin-top: 0;
+  padding: 0 8px 2px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 140, 100, 0.92);
+  animation: statusFade var(--motion-medium) ease-out both;
+}
+
+/* —— Session stats footer —— */
+.session-stats {
+  flex-shrink: 0;
+  width: 100%;
+  padding-top: 2px;
+}
+
+.session-stats__rule {
+  height: 1px;
+  margin-bottom: 8px;
+  background: rgba(145, 158, 171, 0.18);
+}
+
+.session-stats__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+}
+
+.session-stats__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.session-stats__label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(145, 158, 171, 0.72);
+}
+
+.session-stats__value {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+/* —— Session summary card (matches timer slot) —— */
+.session-summary-card {
+  width: 100%;
+  height: 320px;
+  min-height: 320px;
+  max-height: 320px;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+  text-align: center;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.session-summary-card__label {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 18px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.session-summary-card__hero {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  min-height: 0;
+}
+
+.session-summary-card__title {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--text);
+}
+
+.session-summary-card__stats {
+  width: 100%;
+  max-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+}
+
+.session-summary-card__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.session-summary-card__row dt {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.session-summary-card__row dd {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.session-summary-card__actions {
+  flex-shrink: 0;
+  width: 100%;
+}
+
+.session-summary-card__done {
+  width: 100%;
+  height: 44px;
+  border-radius: 8px;
+  border: 0;
+  background: linear-gradient(160.24deg, #c3daf4 0%, #1c5ea4 100%);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text);
+  box-shadow: var(--m3-elevation-1);
+  transition:
+    transform var(--motion-short) ease,
+    box-shadow var(--motion-short) ease;
+}
+
+.session-summary-card__done:hover {
+  box-shadow: var(--m3-elevation-2);
+}
+
+.session-summary-card__done:active {
+  transform: scale(0.98);
 }
 
 @keyframes sirenAmbienceColor {
   0%,
   100% {
+    opacity: 0.75;
     background: radial-gradient(
       circle at center,
-      rgba(6, 8, 14, 0.22) 0%,
-      transparent 70%
+      rgba(12, 16, 24, 0.18) 0%,
+      transparent 72%
     );
   }
   25% {
+    opacity: 1;
     background: radial-gradient(
       circle at center,
-      rgba(32, 92, 255, 0.14) 0%,
-      transparent 70%
+      rgba(70, 120, 255, 0.22) 0%,
+      transparent 72%
     );
   }
   50% {
+    opacity: 0.85;
     background: radial-gradient(
       circle at center,
-      rgba(6, 8, 14, 0.22) 0%,
-      transparent 70%
+      rgba(12, 16, 24, 0.18) 0%,
+      transparent 72%
     );
   }
   75% {
+    opacity: 1;
     background: radial-gradient(
       circle at center,
-      rgba(255, 48, 48, 0.1) 0%,
-      transparent 70%
+      rgba(255, 65, 65, 0.18) 0%,
+      transparent 72%
     );
   }
 }
 
-@keyframes sirenAmbienceBreathe {
-  0% {
-    opacity: 0;
-    transform: scale(1);
-  }
-  35% {
-    opacity: 1;
-    transform: scale(1.02);
-  }
-  65% {
-    opacity: 1;
-    transform: scale(1.04);
-  }
+@keyframes alertCardBreathe {
+  0%,
   100% {
-    opacity: 0;
-    transform: scale(1);
+    box-shadow:
+      var(--m3-elevation-2),
+      0 0 48px rgba(70, 120, 255, 0.08);
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    box-shadow:
+      var(--m3-elevation-2),
+      0 0 64px rgba(255, 65, 65, 0.1);
+    transform: translateY(-2px) scale(1.008);
   }
 }
 
-@keyframes alertCardAmbientGlow {
+@keyframes recoveryPulse {
   0% {
-    box-shadow:
-      0 32px 80px rgba(0, 0, 0, 0.45),
-      0 0 60px rgba(30, 90, 255, 0.08);
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
   }
   100% {
-    box-shadow:
-      0 32px 80px rgba(0, 0, 0, 0.45),
-      0 0 60px rgba(255, 50, 50, 0.08);
+    opacity: 0;
+  }
+}
+
+.toast-message {
+  border-color: rgba(48, 180, 120, 0.35);
+  box-shadow: 0 0 24px rgba(48, 180, 120, 0.12);
+  color: rgba(200, 255, 220, 0.95);
+}
+
+@keyframes detectionProgressIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
