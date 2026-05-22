@@ -1,9 +1,12 @@
 "use client";
 
-import { memo, useMemo } from "react";
+import { memo, useEffect, useState } from "react";
 import Image from "next/image";
 import { POLICE_MAN_ALERT, POLICE_MAN_IDLE } from "@/lib/assets";
-import { pickOfficerSpeech } from "@/lib/officerSpeech";
+import {
+  DEFAULT_MASCOT_MESSAGE,
+  pickOfficerSpeech,
+} from "@/lib/officerSpeech";
 import type { MascotState } from "@/lib/types";
 
 function PoliceMascotInner({
@@ -25,10 +28,17 @@ function PoliceMascotInner({
       ? POLICE_MAN_ALERT
       : POLICE_MAN_IDLE;
 
-  const speech = useMemo(
-    () => pickOfficerSpeech(resolvedState),
-    [resolvedState]
-  );
+  const [mounted, setMounted] = useState(false);
+  const [speech, setSpeech] = useState(DEFAULT_MASCOT_MESSAGE);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    setSpeech(pickOfficerSpeech(resolvedState));
+  }, [mounted, resolvedState]);
 
   return (
     <div className="police-mascot-wrap">

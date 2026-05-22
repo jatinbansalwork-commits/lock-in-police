@@ -1,5 +1,8 @@
 import type { MascotState } from "./types";
 
+/** Stable SSR / first-paint line — must match server and client before mount */
+export const DEFAULT_MASCOT_MESSAGE = "Ready when you are.";
+
 const LINES: Record<MascotState, readonly string[]> = {
   IDLE: ["Stay focused.", "Ready when you are.", "Lock in soon."],
   LOCKED_IN: ["Eyes on work.", "Stay focused.", "Good discipline."],

@@ -652,6 +652,9 @@ body {
   position: relative;
   flex: 1 1 0;
   min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
   border-radius: 18px;
 }
@@ -664,6 +667,8 @@ body {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center 42%;
+  transform: translateY(-2%);
   transition: opacity 220ms ease, visibility 220ms ease;
 }
 
@@ -684,6 +689,8 @@ body {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center 42%;
+  transform: translateY(-2%);
   opacity: 0;
   pointer-events: none;
   transition: opacity 150ms ease, filter 200ms ease;
