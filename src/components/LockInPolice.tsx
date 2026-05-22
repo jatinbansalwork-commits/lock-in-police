@@ -16,10 +16,9 @@ import { Toast } from "./Toast";
 import { WantedBanner } from "./WantedBanner";
 import { pickAlertMessage, pickOfficerLine } from "@/lib/alertMessages";
 import {
-  PHONE_LOST_MS,
   RECOVERY_FEEDBACK_MS,
   RECOVERY_SECONDS,
-  SIREN_FADE_RECOVERY_MS,
+  SIREN_FADE_IDLE_MS,
   STRICT_VIOLATION_LIMIT,
   SURVEILLANCE_FREEZE_MS,
   SURVEILLANCE_RESUME_MS,
@@ -43,6 +42,7 @@ import {
   type DailyRecord,
 } from "@/lib/storage";
 import type {
+  AlertState,
   CameraSessionStatus,
   CameraState,
   ConfidenceLevel,
@@ -122,6 +122,9 @@ function clearSirenAmbientClasses() {
 export function LockInPolice() {
   const [sessionState, setSessionState] = useState<SessionState>("IDLE");
   const sessionStateRef = useRef<SessionState>("IDLE");
+  const [alertState, setAlertState] = useState<AlertState>("IDLE");
+  const alertStateRef = useRef<AlertState>("IDLE");
+  const [recoveryCountdown, setRecoveryCountdown] = useState(0);
   const [minutesInput, setMinutesInput] = useState("");
   const [secondsLeft, setSecondsLeft] = useState(0);
 
@@ -177,6 +180,10 @@ export function LockInPolice() {
   useEffect(() => {
     sessionStateRef.current = sessionState;
   }, [sessionState]);
+
+  useEffect(() => {
+    alertStateRef.current = alertState;
+  }, [alertState]);
 
   useEffect(() => {
     const settings = loadSettings();
@@ -240,9 +247,13 @@ export function LockInPolice() {
   }, []);
 
   const stopAllEffects = useCallback(() => {
-    stopLoop();
+    setAlertState("IDLE");
+    setRecoveryCountdown(0);
+    stopLoop(SIREN_FADE_IDLE_MS);
     stopSpeech();
     clearSirenAmbientClasses();
+    document.body.classList.remove("alert-era-active");
+    document.documentElement.classList.remove("alert-era-active");
   }, [stopLoop, stopSpeech]);
 
   const playAlertAudio = useCallback(() => {
@@ -253,6 +264,8 @@ export function LockInPolice() {
   const enterLockedIn = useCallback(() => {
     recoveryStartedRef.current = false;
     phoneClearSinceRef.current = null;
+    setAlertState("IDLE");
+    setRecoveryCountdown(0);
     setRecoveryElapsed(0);
     recoveryElapsedRef.current = 0;
     setSessionState("LOCKED_IN");
@@ -272,9 +285,12 @@ export function LockInPolice() {
     saveActiveSession(null);
   }, [stopAllEffects, clearSequenceTimers, clearRecoveryInterval]);
 
-  const finishRecovery = useCallback(() => {
+  const finishAlertRecovery = useCallback(() => {
     clearRecoveryInterval();
-    stopLoop(SIREN_FADE_RECOVERY_MS);
+    recoveryStartedRef.current = false;
+    setAlertState("IDLE");
+    setRecoveryCountdown(0);
+    stopLoop(SIREN_FADE_IDLE_MS);
     clearSirenAmbientClasses();
     document.body.classList.remove("alert-era-active");
     document.documentElement.classList.remove("alert-era-active");
@@ -297,10 +313,13 @@ export function LockInPolice() {
 
   const beginRecoveryCountdown = useCallback(() => {
     if (recoveryStartedRef.current) return;
-    if (sessionStateRef.current !== "ALERT") return;
+    if (alertStateRef.current !== "ALERT") return;
     if (strictMode) return;
 
     recoveryStartedRef.current = true;
+    phoneClearSinceRef.current = null;
+    setAlertState("RECOVERING");
+    setRecoveryCountdown(RECOVERY_SECONDS);
     stopSpeech();
     clearSequenceTimers();
     setSurveillancePhase("live");
@@ -314,8 +333,10 @@ export function LockInPolice() {
     recoveryIntervalRef.current = setInterval(() => {
       recoveryElapsedRef.current += 1;
       setRecoveryElapsed(recoveryElapsedRef.current);
+      const remaining = RECOVERY_SECONDS - recoveryElapsedRef.current;
+      setRecoveryCountdown(remaining > 0 ? remaining : 0);
       if (recoveryElapsedRef.current >= RECOVERY_SECONDS) {
-        finishRecovery();
+        finishAlertRecovery();
       }
     }, 1000);
   }, [
@@ -323,7 +344,7 @@ export function LockInPolice() {
     stopSpeech,
     clearSequenceTimers,
     clearRecoveryInterval,
-    finishRecovery,
+    finishAlertRecovery,
   ]);
 
   const enterAlert = useCallback(() => {
@@ -367,6 +388,7 @@ export function LockInPolice() {
       lastOfficerLineRef.current = line;
     }
 
+    setAlertState("ALERT");
     setSessionState("ALERT");
     setSurveillancePhase("snapshot");
     setDetectionProgress(0);
@@ -378,6 +400,7 @@ export function LockInPolice() {
 
   const enterPhoneSuspected = useCallback(() => {
     if (sessionStateRef.current !== "LOCKED_IN") return;
+    setAlertState("DETECTING");
     setSessionState("PHONE_SUSPECTED");
   }, []);
 
@@ -397,29 +420,30 @@ export function LockInPolice() {
       setDetectionProgress(signal.progress);
       setConfidenceLevelState(confidenceLevel(signal.confidence));
 
-      const state = sessionStateRef.current;
+      const uiAlert = alertStateRef.current;
 
-      if (state === "RECOVERY" && signal.smoothedPositive) {
-        recoveryElapsedRef.current = 0;
-        setRecoveryElapsed(0);
+      if (uiAlert === "RECOVERING") {
+        if (signal.smoothedPositive) {
+          clearRecoveryInterval();
+          recoveryStartedRef.current = false;
+          recoveryElapsedRef.current = 0;
+          setRecoveryElapsed(0);
+          setRecoveryCountdown(0);
+          setAlertState("ALERT");
+          setSessionState("ALERT");
+        }
         return;
       }
 
-      if (state === "ALERT" && !recoveryStartedRef.current) {
+      if (uiAlert === "ALERT" && !recoveryStartedRef.current) {
         if (signal.smoothedPositive) {
           phoneClearSinceRef.current = null;
         } else {
-          if (phoneClearSinceRef.current === null) {
-            phoneClearSinceRef.current = Date.now();
-          } else if (
-            Date.now() - phoneClearSinceRef.current >= PHONE_LOST_MS
-          ) {
-            beginRecoveryCountdown();
-          }
+          beginRecoveryCountdown();
         }
       }
     },
-    [beginRecoveryCountdown]
+    [beginRecoveryCountdown, clearRecoveryInterval]
   );
 
   const detectionEnabled =
@@ -436,6 +460,7 @@ export function LockInPolice() {
     onPhoneConfirmed: enterPhoneConfirmed,
     onPhoneLost: () => {
       if (sessionStateRef.current !== "PHONE_SUSPECTED") return;
+      setAlertState("IDLE");
       resetDetectionRef.current();
       enterLockedIn();
     },
@@ -444,7 +469,7 @@ export function LockInPolice() {
   resetDetectionRef.current = resetDetection;
 
   const backToWork = useCallback(() => {
-    if (sessionStateRef.current !== "ALERT") return;
+    if (alertStateRef.current !== "ALERT") return;
     if (strictMode) return;
     beginRecoveryCountdown();
   }, [strictMode, beginRecoveryCountdown]);
@@ -514,6 +539,8 @@ export function LockInPolice() {
     setBottomToastVisible(false);
     setSurveillancePhase("live");
     setSirenIntensity("soft");
+    setAlertState("IDLE");
+    setRecoveryCountdown(0);
     setJustLocked(true);
     setSessionState("LOCKED_IN");
     void warmupPhoneDetector();
@@ -537,6 +564,8 @@ export function LockInPolice() {
     setDetectionProgress(0);
     setConfidenceLevelState("none");
     setSecondsLeft(0);
+    setAlertState("IDLE");
+    setRecoveryCountdown(0);
     setSessionState("IDLE");
     saveActiveSession(null);
     clearSirenAmbientClasses();
@@ -584,19 +613,22 @@ export function LockInPolice() {
   const isLanding = sessionState === "IDLE";
   const isSessionComplete = sessionState === "SESSION_COMPLETE";
   const isTerminated = sessionState === "SESSION_TERMINATED";
-  const isRecovering = sessionState === "RECOVERY";
+  const isRecovering =
+    alertState === "RECOVERING" || sessionState === "RECOVERY";
   const isActive =
     sessionState !== "IDLE" &&
     sessionState !== "SESSION_COMPLETE" &&
     sessionState !== "SESSION_TERMINATED";
-  const alertOpen = sessionState === "ALERT";
-  const sirenEraActive =
-    sessionState === "ALERT" || sessionState === "RECOVERY";
+  const alertPopupOpen =
+    alertState === "ALERT" || alertState === "RECOVERING";
+  const alertAudioActive = alertPopupOpen;
   const phoneSuspected = sessionState === "PHONE_SUSPECTED";
   const showDetectionProgress =
-    phoneSuspected || sessionState === "PHONE_CONFIRMED";
+    alertState === "DETECTING" ||
+    phoneSuspected ||
+    sessionState === "PHONE_CONFIRMED";
   const timerPaused =
-    alertOpen || isRecovering || isTerminated || isSessionComplete;
+    alertPopupOpen || isTerminated || isSessionComplete;
 
   const mascotState = useMemo(
     () => mascotStateFromSession(sessionState, strictMode, violationCount),
@@ -604,21 +636,21 @@ export function LockInPolice() {
   );
 
   const cameraState: CameraState = useMemo(() => {
-    if (sessionState === "ALERT" || isRecovering) return "alert";
+    if (alertPopupOpen) return "alert";
     if (phoneSuspected || sessionState === "PHONE_CONFIRMED") {
       return "phone-suspected";
     }
     if (isActive) return "active";
     return "ready";
-  }, [sessionState, phoneSuspected, isRecovering, isActive]);
+  }, [alertPopupOpen, phoneSuspected, isActive, sessionState]);
 
   const cameraSessionStatus: CameraSessionStatus = useMemo(() => {
-    if (sessionState === "ALERT" || sessionState === "PHONE_CONFIRMED") {
+    if (alertPopupOpen || sessionState === "PHONE_CONFIRMED") {
       return "phone-found";
     }
     if (isActive) return "locked-in";
     return "ready";
-  }, [sessionState, isActive]);
+  }, [alertPopupOpen, sessionState, isActive]);
 
   useEffect(() => {
     if (!phoneSuspected) return;
@@ -631,7 +663,7 @@ export function LockInPolice() {
   }, [phoneSuspected]);
 
   useEffect(() => {
-    if (!sirenEraActive) return;
+    if (!alertAudioActive) return;
 
     document.body.classList.add("alert-era-active");
     document.documentElement.classList.add("alert-era-active");
@@ -643,7 +675,7 @@ export function LockInPolice() {
       document.documentElement.classList.remove("alert-era-active");
       clearSirenAmbientClasses();
     };
-  }, [sirenEraActive, playLoop, sirenIntensity, violationCount]);
+  }, [alertAudioActive, playLoop, sirenIntensity, violationCount]);
 
   const railTimerSlot = isTerminated ? (
     <SessionTerminatedCard onDone={stopSession} />
@@ -718,18 +750,27 @@ export function LockInPolice() {
           </aside>
         </main>
 
-        {alertOpen ? (
-          <div className="alert-warning-strip" role="alert" aria-live="assertive">
+        {alertPopupOpen ? (
+          <div
+            className={`alert-warning-strip ${alertState === "RECOVERING" ? "alert-warning-strip--recovering" : ""}`}
+            role="alert"
+            aria-live="assertive"
+          >
             <span className="alert-warning-strip__icon" aria-hidden>
-              ⚠
+              {alertState === "RECOVERING" ? "🟡" : "🚨"}
             </span>
-            <span className="alert-warning-strip__text">PHONE DETECTED</span>
+            <span className="alert-warning-strip__text">
+              {alertState === "RECOVERING"
+                ? "Confirming focus..."
+                : "PHONE DETECTED"}
+            </span>
           </div>
         ) : null}
 
         <AlertMode
-          open={alertOpen}
+          alertState={alertState}
           alertMessage={alertMessage}
+          recoveryCountdown={recoveryCountdown}
           violationLevel={Math.min(3, Math.max(1, violationCount))}
           onBackToWork={backToWork}
           onStopSession={stopSession}

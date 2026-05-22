@@ -1,3 +1,5 @@
+export type AlertState = "IDLE" | "DETECTING" | "ALERT" | "RECOVERING";
+
 export type SessionState =
   | "IDLE"
   | "LOCKED_IN"

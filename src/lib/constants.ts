@@ -19,7 +19,9 @@ export const PHONE_MAX_AREA_RATIO = 0.55;
 export const PHONE_BBOX_IOU_MIN = 0.08;
 export const PHONE_MODEL_MIN_SCORE = 0.35;
 
-export const RECOVERY_SECONDS = 10;
+export const RECOVERY_SECONDS = 3;
+export const ALERT_POPUP_RECOVERY_MS = 3000;
+export const SIREN_FADE_IDLE_MS = 300;
 export const RECOVERY_FEEDBACK_MS = 600;
 export const STRICT_VIOLATION_LIMIT = 3;
 export const RECOVERY_WATCH_INTERVAL_MS = 150;

@@ -1235,6 +1235,52 @@ body.recovery-pulse-active::after {
   color: #ffffff;
 }
 
+.alert-warning-strip--recovering {
+  background: linear-gradient(
+    180deg,
+    rgba(120, 90, 18, 0.94) 0%,
+    rgba(80, 60, 10, 0.9) 100%
+  );
+  border-bottom-color: rgba(255, 200, 80, 0.55);
+  box-shadow: 0 8px 32px rgba(255, 180, 40, 0.22);
+}
+
+.alert-card--recovering {
+  border-color: rgba(255, 200, 80, 0.45);
+  box-shadow: 0 0 72px rgba(255, 180, 40, 0.22);
+}
+
+.alert-card__title--recovering {
+  color: #ffd666 !important;
+  font-size: clamp(28px, 4vw, 36px);
+}
+
+.alert-card__mode--recovering {
+  color: rgba(255, 220, 140, 0.85);
+}
+
+.alert-card__countdown {
+  margin-top: 16px;
+  font-size: clamp(4rem, 12vw, 6rem);
+  font-weight: 800;
+  line-height: 1;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums lining-nums;
+  animation: alertCountdownPulse 1s ease-in-out infinite;
+}
+
+@keyframes alertCountdownPulse {
+  0%,
+  100% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
 /* —— Alert overlay (card only, viewport-fixed) —— */
 .alert-overlay {
   position: fixed;
