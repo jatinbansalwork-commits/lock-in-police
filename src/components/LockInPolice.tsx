@@ -4,24 +4,50 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertMode } from "./AlertMode";
 import { BentoCard } from "./BentoCard";
 import { CameraPreview } from "./CameraPreview";
+import { DailyRecordPanel } from "./DailyRecord";
 import { DetectionProgress } from "./DetectionProgress";
 import { FocusTimerCard } from "./FocusTimerCard";
+import { OffenseBadge } from "./OffenseBadge";
 import { PoliceMascot } from "./PoliceMascot";
-import { SessionStatsFooter } from "./SessionStatsFooter";
 import { SessionSummaryCard } from "./SessionSummaryCard";
+import { SessionTerminatedCard } from "./SessionTerminatedCard";
+import { StrictModeToggle } from "./StrictModeToggle";
 import { Toast } from "./Toast";
+import { WantedBanner } from "./WantedBanner";
 import { pickAlertMessage, pickOfficerLine } from "@/lib/alertMessages";
 import {
+  PHONE_LOST_MS,
   RECOVERY_FEEDBACK_MS,
+  RECOVERY_SECONDS,
+  SIREN_FADE_RECOVERY_MS,
+  STRICT_VIOLATION_LIMIT,
   SURVEILLANCE_FREEZE_MS,
   SURVEILLANCE_RESUME_MS,
 } from "@/lib/constants";
+import { computeFocusScore, focusScoreLabel } from "@/lib/focusScore";
+import {
+  alertPulseClass,
+  sirenIntensityForViolation,
+  sirenVolumeScale,
+} from "@/lib/offense";
+import {
+  incrementTotalCaptures,
+  loadActiveSession,
+  loadDailyRecord,
+  loadSettings,
+  loadTotalCaptures,
+  recordCompletedSession,
+  saveActiveSession,
+  saveDailyRecord,
+  saveSettings,
+  type DailyRecord,
+} from "@/lib/storage";
 import type {
   CameraSessionStatus,
   CameraState,
   ConfidenceLevel,
   DetectionSignal,
-  OfficerVariant,
+  MascotState,
   SessionState,
   SessionSummary,
   SirenIntensity,
@@ -29,6 +55,7 @@ import type {
 } from "@/lib/types";
 import { isValidMinutesInput, parseMinutesInput } from "@/lib/utils";
 import { usePhoneObjectDetection } from "@/hooks/usePhoneObjectDetection";
+import { useRecoverySound } from "@/hooks/useRecoverySound";
 import { warmupPhoneDetector } from "@/lib/phoneDetectorModel";
 import { useSirenSound } from "@/hooks/useSirenSound";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
@@ -41,18 +68,55 @@ function confidenceLevel(score: number): ConfidenceLevel {
   return "high";
 }
 
-function violationToIntensity(count: number): SirenIntensity {
-  if (count >= 3) return "max";
-  if (count >= 2) return "strong";
-  return "soft";
+function mascotStateFromSession(
+  sessionState: SessionState,
+  strictMode: boolean,
+  violations: number
+): MascotState {
+  if (sessionState === "IDLE") return "IDLE";
+  if (sessionState === "SESSION_TERMINATED") return "STRICT";
+  if (sessionState === "RECOVERY") return "RECOVERY";
+  if (sessionState === "ALERT" || sessionState === "PHONE_CONFIRMED") {
+    return "ALERT";
+  }
+  if (sessionState === "PHONE_SUSPECTED") return "WATCHING";
+  if (strictMode && violations >= 2) return "STRICT";
+  return "LOCKED_IN";
 }
 
-function computeFocusPercent(
-  focusSeconds: number,
-  totalSeconds: number
-): number {
-  if (totalSeconds <= 0) return 100;
-  return Math.min(100, Math.max(0, Math.round((focusSeconds / totalSeconds) * 100)));
+function applySirenAmbientClasses(violationCount: number) {
+  const classes = alertPulseClass(violationCount).split(" ");
+  document.body.classList.remove(
+    "siren-ambient-active",
+    "siren-ambient--strong",
+    "siren-ambient--max"
+  );
+  document.documentElement.classList.remove(
+    "siren-ambient-active",
+    "siren-ambient--strong",
+    "siren-ambient--max"
+  );
+  classes.forEach((c) => {
+    document.body.classList.add(c);
+    document.documentElement.classList.add(c);
+  });
+}
+
+function clearSirenAmbientClasses() {
+  document.body.classList.remove(
+    "siren-ambient-active",
+    "siren-ambient--strong",
+    "siren-ambient--max",
+    "recovery-pulse-active",
+    "phone-suspected-ambient"
+  );
+  document.documentElement.classList.remove(
+    "siren-ambient-active",
+    "siren-ambient--strong",
+    "siren-ambient--max",
+    "recovery-pulse-active",
+    "phone-suspected-ambient"
+  );
 }
 
 export function LockInPolice() {
@@ -64,7 +128,6 @@ export function LockInPolice() {
   const [surveillancePhase, setSurveillancePhase] =
     useState<SurveillancePhase>("live");
   const [alertMessage, setAlertMessage] = useState("");
-  const [officerCaption, setOfficerCaption] = useState<string | null>(null);
   const [streamReady, setStreamReady] = useState(false);
   const [justLocked, setJustLocked] = useState(false);
   const [sessionSummary, setSessionSummary] = useState<SessionSummary | null>(
@@ -75,7 +138,12 @@ export function LockInPolice() {
   const [detectionProgress, setDetectionProgress] = useState(0);
   const [confidenceLevelState, setConfidenceLevelState] =
     useState<ConfidenceLevel>("none");
-  const [liveFocusPercent, setLiveFocusPercent] = useState(100);
+  const [recoveryElapsed, setRecoveryElapsed] = useState(0);
+  const [strictMode, setStrictMode] = useState(false);
+  const [totalCaptures, setTotalCaptures] = useState(0);
+  const [dailyRecord, setDailyRecord] = useState<DailyRecord>(() =>
+    loadDailyRecord()
+  );
 
   const lastAlertMessageRef = useRef<string | null>(null);
   const lastOfficerLineRef = useRef<string | null>(null);
@@ -90,11 +158,18 @@ export function LockInPolice() {
   const focusSecondsRef = useRef(0);
   const currentStreakRef = useRef(0);
   const longestStreakRef = useRef(0);
+  const interruptionsRef = useRef(0);
+  const recoveryElapsedRef = useRef(0);
+  const phoneClearSinceRef = useRef<number | null>(null);
+  const recoveryStartedRef = useRef(false);
 
+  const recoveryIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sequenceTimersRef = useRef<number[]>([]);
+
   const { speakAlertOnce, stop: stopSpeech } = useSpeechSynthesis();
   const { playLoop, stopLoop } = useSirenSound();
+  const { playRecoveryChime } = useRecoverySound();
   const { playClick } = useUIClick();
 
   const lockInEnabled = isValidMinutesInput(minutesInput);
@@ -103,9 +178,59 @@ export function LockInPolice() {
     sessionStateRef.current = sessionState;
   }, [sessionState]);
 
+  useEffect(() => {
+    const settings = loadSettings();
+    setStrictMode(settings.strictMode);
+    setTotalCaptures(loadTotalCaptures());
+    setDailyRecord(loadDailyRecord());
+
+    const snap = loadActiveSession();
+    if (snap && snap.state !== "IDLE" && snap.state !== "SESSION_COMPLETE") {
+      violationCountRef.current = snap.violations;
+      setViolationCount(snap.violations);
+      setSecondsLeft(snap.secondsLeft);
+      initialSessionSecondsRef.current = snap.initialSeconds;
+      focusSecondsRef.current = snap.focusSeconds;
+      longestStreakRef.current = snap.longestStreakSeconds;
+      interruptionsRef.current = snap.interruptions;
+      setSessionState(snap.state as SessionState);
+    }
+  }, []);
+
+  const persistSession = useCallback(() => {
+    if (
+      sessionStateRef.current === "IDLE" ||
+      sessionStateRef.current === "SESSION_COMPLETE" ||
+      sessionStateRef.current === "SESSION_TERMINATED"
+    ) {
+      saveActiveSession(null);
+      return;
+    }
+    saveActiveSession({
+      state: sessionStateRef.current,
+      secondsLeft,
+      violations: violationCountRef.current,
+      interruptions: interruptionsRef.current,
+      initialSeconds: initialSessionSecondsRef.current,
+      focusSeconds: focusSecondsRef.current,
+      longestStreakSeconds: longestStreakRef.current,
+    });
+  }, [secondsLeft]);
+
+  useEffect(() => {
+    persistSession();
+  }, [sessionState, secondsLeft, violationCount, persistSession]);
+
   const clearSequenceTimers = useCallback(() => {
     sequenceTimersRef.current.forEach((id) => window.clearTimeout(id));
     sequenceTimersRef.current = [];
+  }, []);
+
+  const clearRecoveryInterval = useCallback(() => {
+    if (recoveryIntervalRef.current) {
+      clearInterval(recoveryIntervalRef.current);
+      recoveryIntervalRef.current = null;
+    }
   }, []);
 
   const schedule = useCallback((fn: () => void, ms: number) => {
@@ -117,6 +242,7 @@ export function LockInPolice() {
   const stopAllEffects = useCallback(() => {
     stopLoop();
     stopSpeech();
+    clearSirenAmbientClasses();
   }, [stopLoop, stopSpeech]);
 
   const playAlertAudio = useCallback(() => {
@@ -125,37 +251,119 @@ export function LockInPolice() {
   }, [playClick, speakAlertOnce]);
 
   const enterLockedIn = useCallback(() => {
+    recoveryStartedRef.current = false;
+    phoneClearSinceRef.current = null;
+    setRecoveryElapsed(0);
+    recoveryElapsedRef.current = 0;
     setSessionState("LOCKED_IN");
     setSurveillancePhase("live");
-    setOfficerCaption(null);
     setDetectionProgress(0);
     setConfidenceLevelState("none");
   }, []);
 
   const resetDetectionRef = useRef<() => void>(() => undefined);
 
+  const terminateSession = useCallback(() => {
+    stopAllEffects();
+    clearSequenceTimers();
+    clearRecoveryInterval();
+    setSurveillancePhase("live");
+    setSessionState("SESSION_TERMINATED");
+    saveActiveSession(null);
+  }, [stopAllEffects, clearSequenceTimers, clearRecoveryInterval]);
+
+  const finishRecovery = useCallback(() => {
+    clearRecoveryInterval();
+    interruptionsRef.current += 1;
+    setBottomToastVisible(true);
+    document.body.classList.add("recovery-pulse-active");
+    document.documentElement.classList.add("recovery-pulse-active");
+    playRecoveryChime();
+
+    if (recoveryTimerRef.current) clearTimeout(recoveryTimerRef.current);
+    recoveryTimerRef.current = setTimeout(() => {
+      recoveryTimerRef.current = null;
+      setBottomToastVisible(false);
+      document.body.classList.remove("recovery-pulse-active");
+      document.documentElement.classList.remove("recovery-pulse-active");
+      resetDetectionRef.current();
+      enterLockedIn();
+    }, RECOVERY_FEEDBACK_MS);
+  }, [clearRecoveryInterval, playRecoveryChime, enterLockedIn]);
+
+  const beginRecoveryCountdown = useCallback(() => {
+    if (recoveryStartedRef.current) return;
+    if (sessionStateRef.current !== "ALERT") return;
+    if (strictMode) return;
+
+    recoveryStartedRef.current = true;
+    stopLoop(SIREN_FADE_RECOVERY_MS);
+    stopSpeech();
+    clearSirenAmbientClasses();
+    clearSequenceTimers();
+    setSurveillancePhase("live");
+    setSessionState("RECOVERY");
+    setDetectionProgress(0);
+    setConfidenceLevelState("none");
+    recoveryElapsedRef.current = 0;
+    setRecoveryElapsed(0);
+
+    clearRecoveryInterval();
+    recoveryIntervalRef.current = setInterval(() => {
+      recoveryElapsedRef.current += 1;
+      setRecoveryElapsed(recoveryElapsedRef.current);
+      if (recoveryElapsedRef.current >= RECOVERY_SECONDS) {
+        finishRecovery();
+      }
+    }, 1000);
+  }, [
+    strictMode,
+    stopLoop,
+    stopSpeech,
+    clearSequenceTimers,
+    clearRecoveryInterval,
+    finishRecovery,
+  ]);
+
   const enterAlert = useCallback(() => {
     violationCountRef.current += 1;
     setViolationCount(violationCountRef.current);
     currentStreakRef.current = 0;
+    recoveryStartedRef.current = false;
+    phoneClearSinceRef.current = null;
 
-    const violation = Math.min(
-      3,
-      violationCountRef.current
-    ) as 1 | 2 | 3;
-    const intensity = violationToIntensity(violationCountRef.current);
+    const captures = incrementTotalCaptures();
+    setTotalCaptures(captures);
+
+    const daily = loadDailyRecord();
+    const nextDaily = {
+      ...daily,
+      violations: daily.violations + 1,
+    };
+    saveDailyRecord(nextDaily);
+    setDailyRecord(nextDaily);
+
+    if (strictMode && violationCountRef.current >= STRICT_VIOLATION_LIMIT) {
+      terminateSession();
+      return;
+    }
+
+    const intensity = sirenIntensityForViolation(violationCountRef.current);
     setSirenIntensity(intensity);
 
-    const message = pickAlertMessage(lastAlertMessageRef.current, intensity);
+    const message = pickAlertMessage(
+      lastAlertMessageRef.current,
+      intensity === "max" ? "max" : intensity === "strong" ? "strong" : "soft"
+    );
     lastAlertMessageRef.current = message;
     setAlertMessage(message);
 
-    if (violation >= 3) {
-      const line = pickOfficerLine(violation, lastOfficerLineRef.current);
+    if (violationCountRef.current >= 3) {
+      const line = pickOfficerLine(
+        Math.min(3, violationCountRef.current) as 1 | 2 | 3,
+        lastOfficerLineRef.current
+      );
       lastOfficerLineRef.current = line;
-      setOfficerCaption(line);
-    } else {
-      setOfficerCaption(null);
     }
 
     setSessionState("ALERT");
@@ -165,7 +373,7 @@ export function LockInPolice() {
 
     schedule(() => setSurveillancePhase("darken"), SURVEILLANCE_FREEZE_MS);
     schedule(() => setSurveillancePhase("live"), SURVEILLANCE_RESUME_MS);
-  }, [playAlertAudio, schedule]);
+  }, [strictMode, playAlertAudio, schedule, terminateSession]);
 
   const enterPhoneSuspected = useCallback(() => {
     if (sessionStateRef.current !== "LOCKED_IN") return;
@@ -183,13 +391,41 @@ export function LockInPolice() {
     enterAlert();
   }, [enterAlert]);
 
-  const handleDetectionSignal = useCallback((signal: DetectionSignal) => {
-    setDetectionProgress(signal.progress);
-    setConfidenceLevelState(confidenceLevel(signal.confidence));
-  }, []);
+  const handleDetectionSignal = useCallback(
+    (signal: DetectionSignal) => {
+      setDetectionProgress(signal.progress);
+      setConfidenceLevelState(confidenceLevel(signal.confidence));
+
+      const state = sessionStateRef.current;
+
+      if (state === "RECOVERY" && signal.smoothedPositive) {
+        recoveryElapsedRef.current = 0;
+        setRecoveryElapsed(0);
+        return;
+      }
+
+      if (state === "ALERT" && !recoveryStartedRef.current) {
+        if (signal.smoothedPositive) {
+          phoneClearSinceRef.current = null;
+        } else {
+          if (phoneClearSinceRef.current === null) {
+            phoneClearSinceRef.current = Date.now();
+          } else if (
+            Date.now() - phoneClearSinceRef.current >= PHONE_LOST_MS
+          ) {
+            beginRecoveryCountdown();
+          }
+        }
+      }
+    },
+    [beginRecoveryCountdown]
+  );
 
   const detectionEnabled =
-    sessionState === "LOCKED_IN" || sessionState === "PHONE_SUSPECTED";
+    sessionState === "LOCKED_IN" ||
+    sessionState === "PHONE_SUSPECTED" ||
+    sessionState === "ALERT" ||
+    sessionState === "RECOVERY";
 
   const { resetDetection } = usePhoneObjectDetection({
     video: detectionVideo,
@@ -206,33 +442,11 @@ export function LockInPolice() {
 
   resetDetectionRef.current = resetDetection;
 
-  const beginRecovery = useCallback(() => {
-    stopAllEffects();
-    clearSequenceTimers();
-    setSurveillancePhase("live");
-    setSessionState("RECOVERY");
-    setDetectionProgress(0);
-    setConfidenceLevelState("none");
-    setBottomToastVisible(true);
-
-    document.body.classList.add("recovery-pulse-active");
-    document.documentElement.classList.add("recovery-pulse-active");
-
-    if (recoveryTimerRef.current) clearTimeout(recoveryTimerRef.current);
-    recoveryTimerRef.current = setTimeout(() => {
-      recoveryTimerRef.current = null;
-      setBottomToastVisible(false);
-      document.body.classList.remove("recovery-pulse-active");
-      document.documentElement.classList.remove("recovery-pulse-active");
-      resetDetection();
-      enterLockedIn();
-    }, RECOVERY_FEEDBACK_MS);
-  }, [stopAllEffects, clearSequenceTimers, resetDetection, enterLockedIn]);
-
   const backToWork = useCallback(() => {
     if (sessionStateRef.current !== "ALERT") return;
-    beginRecovery();
-  }, [beginRecovery]);
+    if (strictMode) return;
+    beginRecoveryCountdown();
+  }, [strictMode, beginRecoveryCountdown]);
 
   const handleVideoReady = useCallback((video: HTMLVideoElement | null) => {
     setDetectionVideo(video);
@@ -245,27 +459,40 @@ export function LockInPolice() {
     focusSecondsRef.current = 0;
     currentStreakRef.current = 0;
     longestStreakRef.current = 0;
-    setLiveFocusPercent(100);
+    interruptionsRef.current = 0;
+    recoveryElapsedRef.current = 0;
+    setRecoveryElapsed(0);
     setSessionSummary(null);
   }, []);
 
   const completeSession = useCallback(() => {
     stopAllEffects();
     clearSequenceTimers();
+    clearRecoveryInterval();
     setSurveillancePhase("live");
-    setDetectionProgress(0);
-    setConfidenceLevelState("none");
 
-    const total = initialSessionSecondsRef.current;
-    const focusPercent = computeFocusPercent(focusSecondsRef.current, total);
+    const violations = violationCountRef.current;
+    const score = computeFocusScore(
+      violations,
+      interruptionsRef.current,
+      true
+    );
 
     setSessionSummary({
-      focusPercent,
-      pickups: violationCountRef.current,
+      focusScore: score,
+      focusLabel: focusScoreLabel(score),
+      pickups: violations,
       longestStreakMinutes: Math.floor(longestStreakRef.current / 60),
+      interruptions: interruptionsRef.current,
     });
+
+    const focusedMinutes = Math.round(
+      focusSecondsRef.current / 60
+    );
+    setDailyRecord(recordCompletedSession(focusedMinutes, violations));
     setSessionState("SESSION_COMPLETE");
-  }, [stopAllEffects, clearSequenceTimers]);
+    saveActiveSession(null);
+  }, [stopAllEffects, clearSequenceTimers, clearRecoveryInterval]);
 
   const startSession = () => {
     if (!lockInEnabled) return;
@@ -276,6 +503,7 @@ export function LockInPolice() {
     resetSessionMetrics();
     stopAllEffects();
     clearSequenceTimers();
+    clearRecoveryInterval();
     if (recoveryTimerRef.current) clearTimeout(recoveryTimerRef.current);
     violationCountRef.current = 0;
     setViolationCount(0);
@@ -284,7 +512,6 @@ export function LockInPolice() {
     resetDetection();
     setBottomToastVisible(false);
     setSurveillancePhase("live");
-    setOfficerCaption(null);
     setSirenIntensity("soft");
     setJustLocked(true);
     setSessionState("LOCKED_IN");
@@ -295,6 +522,7 @@ export function LockInPolice() {
   const stopSession = useCallback(() => {
     stopAllEffects();
     clearSequenceTimers();
+    clearRecoveryInterval();
     if (recoveryTimerRef.current) clearTimeout(recoveryTimerRef.current);
     violationCountRef.current = 0;
     setViolationCount(0);
@@ -304,19 +532,25 @@ export function LockInPolice() {
     resetSessionMetrics();
     setBottomToastVisible(false);
     setSurveillancePhase("live");
-    setOfficerCaption(null);
     setSirenIntensity("soft");
     setDetectionProgress(0);
     setConfidenceLevelState("none");
     setSecondsLeft(0);
     setSessionState("IDLE");
-    document.body.classList.remove("siren-ambient-active");
-    document.body.classList.remove("recovery-pulse-active");
-    document.body.classList.remove("phone-suspected-ambient");
-    document.documentElement.classList.remove("siren-ambient-active");
-    document.documentElement.classList.remove("recovery-pulse-active");
-    document.documentElement.classList.remove("phone-suspected-ambient");
-  }, [stopAllEffects, clearSequenceTimers, resetDetection, resetSessionMetrics]);
+    saveActiveSession(null);
+    clearSirenAmbientClasses();
+  }, [
+    stopAllEffects,
+    clearSequenceTimers,
+    clearRecoveryInterval,
+    resetDetection,
+    resetSessionMetrics,
+  ]);
+
+  const handleStrictModeChange = useCallback((next: boolean) => {
+    setStrictMode(next);
+    saveSettings({ strictMode: next });
+  }, []);
 
   useEffect(() => {
     if (sessionState !== "LOCKED_IN") return;
@@ -328,16 +562,11 @@ export function LockInPolice() {
       }
 
       setSecondsLeft((s) => {
-        const next = s <= 1 ? 0 : s - 1;
-        const elapsed = Math.max(
-          1,
-          initialSessionSecondsRef.current - next
-        );
-        setLiveFocusPercent(
-          computeFocusPercent(focusSecondsRef.current, elapsed)
-        );
-        if (s <= 1) completeSession();
-        return next;
+        if (s <= 1) {
+          completeSession();
+          return 0;
+        }
+        return s - 1;
       });
     }, 1000);
     return () => clearInterval(id);
@@ -346,31 +575,40 @@ export function LockInPolice() {
   useEffect(() => {
     return () => {
       clearSequenceTimers();
+      clearRecoveryInterval();
       if (recoveryTimerRef.current) clearTimeout(recoveryTimerRef.current);
     };
-  }, [clearSequenceTimers]);
+  }, [clearSequenceTimers, clearRecoveryInterval]);
 
   const isLanding = sessionState === "IDLE";
   const isSessionComplete = sessionState === "SESSION_COMPLETE";
+  const isTerminated = sessionState === "SESSION_TERMINATED";
+  const isRecovering = sessionState === "RECOVERY";
   const isActive =
-    sessionState !== "IDLE" && sessionState !== "SESSION_COMPLETE";
+    sessionState !== "IDLE" &&
+    sessionState !== "SESSION_COMPLETE" &&
+    sessionState !== "SESSION_TERMINATED";
   const alertOpen = sessionState === "ALERT";
   const phoneSuspected = sessionState === "PHONE_SUSPECTED";
   const showDetectionProgress =
     phoneSuspected || sessionState === "PHONE_CONFIRMED";
-  const showSessionStats = isActive && !isSessionComplete;
+  const timerPaused =
+    alertOpen || isRecovering || isTerminated || isSessionComplete;
+
+  const mascotState = useMemo(
+    () => mascotStateFromSession(sessionState, strictMode, violationCount),
+    [sessionState, strictMode, violationCount]
+  );
 
   const cameraState: CameraState = useMemo(() => {
-    if (sessionState === "RECOVERY") return "recovered";
+    if (isRecovering) return "recovered";
     if (sessionState === "ALERT") return "alert";
     if (phoneSuspected || sessionState === "PHONE_CONFIRMED") {
       return "phone-suspected";
     }
-    if (sessionState === "LOCKED_IN" || sessionState === "SESSION_COMPLETE") {
-      return "active";
-    }
+    if (isActive) return "active";
     return "ready";
-  }, [sessionState, phoneSuspected]);
+  }, [sessionState, phoneSuspected, isRecovering, isActive]);
 
   const cameraSessionStatus: CameraSessionStatus = useMemo(() => {
     if (sessionState === "ALERT" || sessionState === "PHONE_CONFIRMED") {
@@ -379,13 +617,6 @@ export function LockInPolice() {
     if (isActive) return "locked-in";
     return "ready";
   }, [sessionState, isActive]);
-
-  const officerVariant: OfficerVariant = useMemo(() => {
-    if (sessionState === "ALERT") return "alert";
-    if (sessionState === "RECOVERY") return "recovered";
-    if (phoneSuspected) return "watching";
-    return "idle";
-  }, [sessionState, phoneSuspected]);
 
   useEffect(() => {
     if (!phoneSuspected) return;
@@ -400,19 +631,38 @@ export function LockInPolice() {
   useEffect(() => {
     if (!alertOpen) return;
 
-    playLoop(sirenIntensity);
-    document.body.classList.add("siren-ambient-active");
-    document.documentElement.classList.add("siren-ambient-active");
+    playLoop(sirenIntensity, sirenVolumeScale(violationCount));
+    applySirenAmbientClasses(violationCount);
 
     return () => {
       stopLoop();
-      document.body.classList.remove("siren-ambient-active");
-      document.documentElement.classList.remove("siren-ambient-active");
+      clearSirenAmbientClasses();
     };
-  }, [alertOpen, playLoop, stopLoop, sirenIntensity]);
+  }, [alertOpen, playLoop, stopLoop, sirenIntensity, violationCount]);
+
+  const railTimerSlot = isTerminated ? (
+    <SessionTerminatedCard onDone={stopSession} />
+  ) : isSessionComplete && sessionSummary ? (
+    <SessionSummaryCard summary={sessionSummary} onDone={stopSession} />
+  ) : (
+    <FocusTimerCard
+      isLanding={isLanding}
+      isActive={isActive}
+      isRecovering={isRecovering}
+      recoveryElapsed={recoveryElapsed}
+      timerPaused={timerPaused}
+      justLocked={justLocked}
+      minutesInput={minutesInput}
+      secondsLeft={secondsLeft}
+      lockInEnabled={lockInEnabled}
+      onMinutesInputChange={setMinutesInput}
+      onLockIn={startSession}
+      onStopSession={stopSession}
+    />
+  );
 
   return (
-    <div className="page-grain relative min-h-screen bg-canvas text-text">
+    <div className="lock-in-app page-grain bg-canvas text-text">
       <div className="dashboard-page">
         <header
           className={`fade-in dashboard-header ${isActive ? "dashboard-header--active" : ""}`}
@@ -425,7 +675,7 @@ export function LockInPolice() {
         <main className="fade-in-delayed dashboard-shell">
           <section className="dashboard-camera">
             <CameraPreview
-              sessionActive={isActive || isSessionComplete}
+              sessionActive={isActive || isSessionComplete || isTerminated}
               streamReady={streamReady}
               cameraState={cameraState}
               sessionStatus={cameraSessionStatus}
@@ -439,47 +689,26 @@ export function LockInPolice() {
           </section>
 
           <aside className="dashboard-rail">
-            {isSessionComplete && sessionSummary ? (
-              <SessionSummaryCard
-                summary={sessionSummary}
-                onDone={stopSession}
-              />
-            ) : (
-              <FocusTimerCard
-                isLanding={isLanding}
-                isActive={isActive}
-                timerPaused={alertOpen}
-                justLocked={justLocked}
-                minutesInput={minutesInput}
-                secondsLeft={secondsLeft}
-                lockInEnabled={lockInEnabled}
-                onMinutesInputChange={setMinutesInput}
-                onLockIn={startSession}
-                onStopSession={stopSession}
-              />
-            )}
+            {railTimerSlot}
+            {isActive && !isTerminated ? (
+              <OffenseBadge violations={violationCount} />
+            ) : null}
+            <StrictModeToggle
+              enabled={strictMode}
+              onChange={handleStrictModeChange}
+              disabled={isActive && !isLanding}
+            />
+            <DailyRecordPanel record={dailyRecord} />
 
             <BentoCard className="police-card glass-card--elev-low">
+              <WantedBanner captures={totalCaptures} />
               <div className="police-card__officer">
                 <PoliceMascot
-                  variant={officerVariant}
-                  pickupCount={violationCount}
+                  state={mascotState}
+                  strictMode={strictMode}
+                  violationCount={violationCount}
                 />
               </div>
-              {officerCaption ? (
-                <p className="police-card__caption">{officerCaption}</p>
-              ) : null}
-              {showSessionStats ? (
-                <SessionStatsFooter
-                  pickups={violationCount}
-                  focusPercent={liveFocusPercent}
-                />
-              ) : isSessionComplete && sessionSummary ? (
-                <SessionStatsFooter
-                  pickups={sessionSummary.pickups}
-                  focusPercent={sessionSummary.focusPercent}
-                />
-              ) : null}
             </BentoCard>
           </aside>
         </main>

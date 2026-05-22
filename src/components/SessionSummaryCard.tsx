@@ -18,18 +18,23 @@ function SessionSummaryCardInner({
       <div className="session-summary-card__hero">
         <h2 className="session-summary-card__title">Session Complete</h2>
 
+        <div className="session-summary-card__score-block">
+          <p className="session-summary-card__score-label">Focus Score</p>
+          <p className="session-summary-card__score tabular-nums">
+            {summary.focusScore}
+            <span className="session-summary-card__score-max"> / 100</span>
+          </p>
+          <p className="session-summary-card__score-tier">{summary.focusLabel}</p>
+        </div>
+
         <dl className="session-summary-card__stats">
           <div className="session-summary-card__row">
-            <dt>Focus</dt>
-            <dd className="tabular-nums">{summary.focusPercent}%</dd>
-          </div>
-          <div className="session-summary-card__row">
-            <dt>Pickups</dt>
+            <dt>Phone pickups</dt>
             <dd className="tabular-nums">{summary.pickups}</dd>
           </div>
           <div className="session-summary-card__row">
             <dt>Longest streak</dt>
-            <dd className="tabular-nums">{summary.longestStreakMinutes}m</dd>
+            <dd className="tabular-nums">{summary.longestStreakMinutes} min</dd>
           </div>
         </dl>
       </div>

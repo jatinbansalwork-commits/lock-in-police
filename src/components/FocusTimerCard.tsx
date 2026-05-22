@@ -3,11 +3,14 @@
 import { memo } from "react";
 import { BentoCard } from "./BentoCard";
 import { CountdownDisplay } from "./CountdownDisplay";
+import { RecoveryPanel } from "./RecoveryPanel";
 import { MAX_MINUTES, MIN_MINUTES } from "@/lib/constants";
 
 type FocusTimerCardProps = {
   isLanding: boolean;
   isActive: boolean;
+  isRecovering?: boolean;
+  recoveryElapsed?: number;
   timerPaused?: boolean;
   justLocked: boolean;
   minutesInput: string;
@@ -21,6 +24,8 @@ type FocusTimerCardProps = {
 function FocusTimerCardInner({
   isLanding,
   isActive,
+  isRecovering = false,
+  recoveryElapsed = 0,
   timerPaused = false,
   justLocked,
   minutesInput,
@@ -32,7 +37,7 @@ function FocusTimerCardInner({
 }: FocusTimerCardProps) {
   return (
     <BentoCard
-      className={`timer-card glass-card--elev-medium ${isActive ? "timer-card--locked" : ""} ${
+      className={`timer-card glass-card--elev-medium timer-card--priority ${isActive ? "timer-card--locked" : ""} ${
         timerPaused ? "timer-card--paused" : ""
       } ${justLocked ? "timer-card--lock-pulse" : ""}`}
     >
@@ -41,7 +46,9 @@ function FocusTimerCardInner({
       <div className="timer-card__hero">
         <h2 className="timer-card__title">Focus Timer</h2>
 
-        {isLanding ? (
+        {isRecovering ? (
+          <RecoveryPanel secondsElapsed={recoveryElapsed} />
+        ) : isLanding ? (
           <label className="timer-card__minutes" htmlFor="minutes">
             <input
               id="minutes"

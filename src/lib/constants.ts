@@ -19,7 +19,10 @@ export const PHONE_MAX_AREA_RATIO = 0.55;
 export const PHONE_BBOX_IOU_MIN = 0.08;
 export const PHONE_MODEL_MIN_SCORE = 0.35;
 
-export const RECOVERY_FEEDBACK_MS = 800;
+export const RECOVERY_SECONDS = 10;
+export const RECOVERY_FEEDBACK_MS = 600;
+export const STRICT_VIOLATION_LIMIT = 3;
+export const RECOVERY_WATCH_INTERVAL_MS = 150;
 export const SURVEILLANCE_FREEZE_MS = 150;
 export const SURVEILLANCE_RESUME_MS = 400;
 
@@ -27,6 +30,7 @@ export const SIREN_PEAK_SOFT = 0.55;
 export const SIREN_PEAK_STRONG = 0.8;
 export const SIREN_FADE_IN_MS = 250;
 export const SIREN_FADE_OUT_MS = 250;
+export const SIREN_FADE_RECOVERY_MS = 325;
 
 export const VOICE_LINES = [
   "HEY.",
