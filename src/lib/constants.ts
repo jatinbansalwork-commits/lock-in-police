@@ -30,7 +30,7 @@ export const SIREN_PEAK_SOFT = 0.55;
 export const SIREN_PEAK_STRONG = 0.8;
 export const SIREN_FADE_IN_MS = 250;
 export const SIREN_FADE_OUT_MS = 250;
-export const SIREN_FADE_RECOVERY_MS = 325;
+export const SIREN_FADE_RECOVERY_MS = 350;
 
 export const VOICE_LINES = [
   "HEY.",

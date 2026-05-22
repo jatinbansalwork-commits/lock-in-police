@@ -30,6 +30,8 @@ function ensureAudio(): HTMLAudioElement | null {
     audio.loop = true;
     audio.preload = "auto";
     siren.audio = audio;
+  } else {
+    siren.audio.loop = true;
   }
 
   return siren.audio;
@@ -90,14 +92,16 @@ export function useSirenSound() {
       const peak = resolvePeakVolume(volumeScale);
       siren.targetVolume = peak;
 
-      if (siren.playing) {
+      if (siren.playing && !audio.paused) {
         rampVolume(audio.volume, peak, 120);
         return;
       }
 
       siren.playing = true;
+      audio.loop = true;
       audio.currentTime = 0;
       audio.volume = 0;
+      cancelFade();
       void audio.play().catch(() => undefined);
       rampVolume(0, peak, SIREN_FADE_IN_MS);
     },

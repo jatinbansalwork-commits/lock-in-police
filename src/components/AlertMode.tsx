@@ -24,7 +24,7 @@ export function AlertMode({
       aria-modal="true"
     >
       <div
-        className={`alert-card alert-card--figma alert-card--violation-${Math.min(3, Math.max(1, violationLevel))}`}
+        className={`alert-card alert-card--figma alert-card--siren-beat alert-card--violation-${Math.min(3, Math.max(1, violationLevel))}`}
       >
         <div className="alert-card__siren-wrap">
           <SirenLight className="h-20 w-20" />
