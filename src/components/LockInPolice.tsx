@@ -9,8 +9,8 @@ import { DetectionProgress } from "./DetectionProgress";
 import { FocusTimerCard } from "./FocusTimerCard";
 import { OffenseBadge } from "./OffenseBadge";
 import { PoliceMascot } from "./PoliceMascot";
-import { SessionSummaryCard } from "./SessionSummaryCard";
-import { SessionTerminatedCard } from "./SessionTerminatedCard";
+import { SessionResultsOverlay } from "./SessionResultsOverlay";
+import { TopToast } from "./TopToast";
 import { StrictModeToggle } from "./StrictModeToggle";
 import { Toast } from "./Toast";
 import { WantedBanner } from "./WantedBanner";
@@ -24,6 +24,10 @@ import {
   SURVEILLANCE_RESUME_MS,
 } from "@/lib/constants";
 import { computeFocusScore, focusScoreLabel } from "@/lib/focusScore";
+import {
+  focusRankFromXp,
+  xpFromFocusMinutes,
+} from "@/lib/focusXp";
 import {
   alertPulseClass,
   sirenIntensityForViolation,
@@ -165,6 +169,10 @@ export function LockInPolice() {
   const recoveryElapsedRef = useRef(0);
   const phoneClearSinceRef = useRef<number | null>(null);
   const recoveryStartedRef = useRef(false);
+  const sessionXpRef = useRef(0);
+  const lastXpMinuteRef = useRef(0);
+  const protectedToastShownRef = useRef(false);
+  const [protectedToastVisible, setProtectedToastVisible] = useState(false);
 
   const recoveryIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -276,14 +284,40 @@ export function LockInPolice() {
 
   const resetDetectionRef = useRef<() => void>(() => undefined);
 
+  const buildSessionSummary = useCallback((completed = true) => {
+    const violations = violationCountRef.current;
+    const score = computeFocusScore(
+      violations,
+      interruptionsRef.current,
+      completed
+    );
+    const focusMinutes = Math.max(
+      0,
+      Math.round(focusSecondsRef.current / 60)
+    );
+    const xp = sessionXpRef.current;
+
+    return {
+      focusScore: score,
+      focusLabel: focusScoreLabel(score),
+      pickups: violations,
+      longestStreakMinutes: Math.floor(longestStreakRef.current / 60),
+      interruptions: interruptionsRef.current,
+      focusMinutes,
+      xp,
+      rank: focusRankFromXp(xp),
+    };
+  }, []);
+
   const terminateSession = useCallback(() => {
     stopAllEffects();
     clearSequenceTimers();
     clearRecoveryInterval();
     setSurveillancePhase("live");
+    setSessionSummary(buildSessionSummary(false));
     setSessionState("SESSION_TERMINATED");
     saveActiveSession(null);
-  }, [stopAllEffects, clearSequenceTimers, clearRecoveryInterval]);
+  }, [stopAllEffects, clearSequenceTimers, clearRecoveryInterval, buildSessionSummary]);
 
   const finishAlertRecovery = useCallback(() => {
     clearRecoveryInterval();
@@ -487,6 +521,10 @@ export function LockInPolice() {
     longestStreakRef.current = 0;
     interruptionsRef.current = 0;
     recoveryElapsedRef.current = 0;
+    sessionXpRef.current = 0;
+    lastXpMinuteRef.current = 0;
+    protectedToastShownRef.current = false;
+    setProtectedToastVisible(false);
     setRecoveryElapsed(0);
     setSessionSummary(null);
   }, []);
@@ -497,28 +535,19 @@ export function LockInPolice() {
     clearRecoveryInterval();
     setSurveillancePhase("live");
 
-    const violations = violationCountRef.current;
-    const score = computeFocusScore(
-      violations,
-      interruptionsRef.current,
-      true
+    const summary = buildSessionSummary(true);
+    setSessionSummary(summary);
+    setDailyRecord(
+      recordCompletedSession(summary.focusMinutes, summary.pickups)
     );
-
-    setSessionSummary({
-      focusScore: score,
-      focusLabel: focusScoreLabel(score),
-      pickups: violations,
-      longestStreakMinutes: Math.floor(longestStreakRef.current / 60),
-      interruptions: interruptionsRef.current,
-    });
-
-    const focusedMinutes = Math.round(
-      focusSecondsRef.current / 60
-    );
-    setDailyRecord(recordCompletedSession(focusedMinutes, violations));
     setSessionState("SESSION_COMPLETE");
     saveActiveSession(null);
-  }, [stopAllEffects, clearSequenceTimers, clearRecoveryInterval]);
+  }, [
+    stopAllEffects,
+    clearSequenceTimers,
+    clearRecoveryInterval,
+    buildSessionSummary,
+  ]);
 
   const startSession = () => {
     if (!lockInEnabled) return;
@@ -589,6 +618,21 @@ export function LockInPolice() {
       currentStreakRef.current += 1;
       if (currentStreakRef.current > longestStreakRef.current) {
         longestStreakRef.current = currentStreakRef.current;
+      }
+
+      const focusMinutes = Math.floor(focusSecondsRef.current / 60);
+      if (focusMinutes > lastXpMinuteRef.current) {
+        lastXpMinuteRef.current = focusMinutes;
+        sessionXpRef.current = xpFromFocusMinutes(focusMinutes);
+      }
+
+      if (
+        !protectedToastShownRef.current &&
+        currentStreakRef.current >= 600
+      ) {
+        protectedToastShownRef.current = true;
+        setProtectedToastVisible(true);
+        window.setTimeout(() => setProtectedToastVisible(false), 4200);
       }
 
       setSecondsLeft((s) => {
@@ -677,10 +721,14 @@ export function LockInPolice() {
     };
   }, [alertAudioActive, playLoop, sirenIntensity, violationCount]);
 
-  const railTimerSlot = isTerminated ? (
-    <SessionTerminatedCard onDone={stopSession} />
-  ) : isSessionComplete && sessionSummary ? (
-    <SessionSummaryCard summary={sessionSummary} onDone={stopSession} />
+  const showSessionResults =
+    (isSessionComplete || isTerminated) && sessionSummary;
+
+  const railTimerSlot = showSessionResults ? (
+    <div
+      className="timer-card timer-card--session-ended"
+      aria-hidden="true"
+    />
   ) : (
     <FocusTimerCard
       isLanding={isLanding}
@@ -778,6 +826,17 @@ export function LockInPolice() {
       </div>
 
       <Toast message="✓ Focus restored" visible={bottomToastVisible} />
+      <TopToast
+        message="Protected. Stay locked."
+        visible={protectedToastVisible}
+      />
+      {showSessionResults ? (
+        <SessionResultsOverlay
+          summary={sessionSummary}
+          variant={isTerminated ? "terminated" : "complete"}
+          onPatrolAgain={stopSession}
+        />
+      ) : null}
     </div>
   );
 }

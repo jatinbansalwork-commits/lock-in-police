@@ -40,10 +40,14 @@ function PoliceMascotInner({
     setSpeech(pickOfficerSpeech(resolvedState));
   }, [mounted, resolvedState]);
 
+  const stateClass = `officer-companion--state-${resolvedState.toLowerCase()}`;
+  const recoveryClass =
+    resolvedState === "RECOVERY" ? "officer-companion--recovered" : "";
+
   return (
     <div className="police-mascot-wrap">
       <div
-        className={`officer-companion officer-companion--state-${resolvedState.toLowerCase()}`}
+        className={`officer-companion ${stateClass} ${recoveryClass}`.trim()}
       >
         <Image
           src={src}
