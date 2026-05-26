@@ -28,12 +28,17 @@ export type CameraSessionStatus = "ready" | "locked-in" | "phone-found";
 
 export type OfficerMood = "calm" | "watch" | "alert";
 
+export type FocusRank = "Cadet" | "Officer" | "Chief";
+
 export type SessionSummary = {
   focusScore: number;
   focusLabel: FocusScoreLabel;
   pickups: number;
   longestStreakMinutes: number;
   interruptions: number;
+  focusMinutes: number;
+  xp: number;
+  rank: FocusRank;
 };
 
 export type OfficerVariant = "idle" | "watching" | "alert" | "recovered";

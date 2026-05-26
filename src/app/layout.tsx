@@ -9,10 +9,43 @@ const publicSans = Public_Sans({
   display: "swap",
 });
 
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ??
+  (process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : "http://localhost:3000");
+
+const title = "Lock-In Police";
+const description = "AI powered focus enforcement. Put the phone down.";
+const ogImage = "/og-lock-in-police.png";
+
 export const metadata: Metadata = {
-  title: "Lock-In Police",
-  description:
-    "A fake surveillance productivity tool — camera watch, siren alerts, and shame dispatch.",
+  metadataBase: new URL(siteUrl),
+  title,
+  description,
+  icons: {
+    icon: [{ url: "/favicon.ico", sizes: "any" }],
+    shortcut: "/favicon.ico",
+  },
+  openGraph: {
+    type: "website",
+    title,
+    description,
+    images: [
+      {
+        url: ogImage,
+        width: 1200,
+        height: 630,
+        alt: "Lock-In Police — Focus Is Not Negotiable",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title,
+    description,
+    images: [ogImage],
+  },
 };
 
 export default function RootLayout({
