@@ -26,7 +26,6 @@ import {
 } from "@/lib/offense";
 import {
   incrementTotalCaptures,
-  loadActiveSession,
   loadTotalCaptures,
   saveActiveSession,
 } from "@/lib/storage";
@@ -42,7 +41,7 @@ import type {
   SirenIntensity,
   SurveillancePhase,
 } from "@/lib/types";
-import { resetAppCacheOnPageReload } from "@/lib/cacheReset";
+import { prepareAppForNewVisit } from "@/lib/cacheReset";
 import { isValidMinutesInput, parseMinutesInput } from "@/lib/utils";
 import { usePhoneObjectDetection } from "@/hooks/usePhoneObjectDetection";
 import { useRecoverySound } from "@/hooks/useRecoverySound";
@@ -166,21 +165,8 @@ export function LockInPolice() {
   }, [alertState]);
 
   useEffect(() => {
-    resetAppCacheOnPageReload();
-
+    prepareAppForNewVisit();
     setTotalCaptures(loadTotalCaptures());
-
-    const snap = loadActiveSession();
-    if (snap && snap.state !== "IDLE" && snap.state !== "SESSION_COMPLETE") {
-      violationCountRef.current = snap.violations;
-      setViolationCount(snap.violations);
-      setSecondsLeft(snap.secondsLeft);
-      initialSessionSecondsRef.current = snap.initialSeconds;
-      focusSecondsRef.current = snap.focusSeconds;
-      longestStreakRef.current = snap.longestStreakSeconds;
-      interruptionsRef.current = snap.interruptions;
-      setSessionState(snap.state as SessionState);
-    }
   }, []);
 
   const persistSession = useCallback(() => {

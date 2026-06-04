@@ -46,10 +46,13 @@ export function loadActiveSession(): ActiveSessionSnapshot | null {
 
 export function saveActiveSession(snapshot: ActiveSessionSnapshot | null): void {
   if (!snapshot) {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem(PREFIX + "active_session");
-    }
+    clearActiveSession();
     return;
   }
   write("active_session", snapshot);
+}
+
+export function clearActiveSession(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(PREFIX + "active_session");
 }

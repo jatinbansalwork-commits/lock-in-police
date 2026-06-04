@@ -10,7 +10,7 @@ alwaysApply: false
 When adding or changing persisted client state (`localStorage` / `sessionStorage`):
 
 1. Use the `lockin_police_` prefix (see `src/lib/storage.ts`).
-2. On full page reload, call `resetAppCacheOnPageReload()` from `src/lib/cacheReset.ts` before reading restored session data (see `LockInPolice` mount effect).
-3. Do not restore active sessions after a reload unless product requirements change — refresh should start clean.
+2. On app load, call `prepareAppForNewVisit()` from `src/lib/cacheReset.ts` before any session reads (see `LockInPolice` mount effect).
+3. Do not restore in-progress sessions from storage — opening the app should always show the Lock in screen. Full reload also clears all `lockin_police_*` keys.
 
 Camera/media code must release `MediaStream` tracks on `pagehide` and component unmount to avoid a stuck camera after reload.

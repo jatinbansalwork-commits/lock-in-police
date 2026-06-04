@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
     if (process.env.NODE_ENV !== "development") return [];
     return [
       {
-        source: "/:path*",
+        source: "/((?!_next/static).*)",
         headers: [
           {
             key: "Cache-Control",

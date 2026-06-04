@@ -1,3 +1,5 @@
+import { clearActiveSession } from "./storage";
+
 const PREFIX = "lockin_police_";
 
 function clearPrefixedStorage(storage: Storage): void {
@@ -19,12 +21,20 @@ export function isPageReload(): boolean {
 }
 
 /**
- * Clears persisted app data on refresh so sessions, captures, and stale
- * camera/session state do not carry over across reloads.
+ * Runs on every app load. Drops any in-progress session so opening the link
+ * always starts on the Lock in screen (no restored countdown).
  */
-export function resetAppCacheOnPageReload(): void {
+export function prepareAppForNewVisit(): void {
   if (typeof window === "undefined") return;
-  if (!isPageReload()) return;
-  clearPrefixedStorage(localStorage);
-  clearPrefixedStorage(sessionStorage);
+  clearActiveSession();
+
+  if (isPageReload()) {
+    clearPrefixedStorage(localStorage);
+    clearPrefixedStorage(sessionStorage);
+  }
+}
+
+/** @deprecated Use prepareAppForNewVisit */
+export function resetAppCacheOnPageReload(): void {
+  prepareAppForNewVisit();
 }

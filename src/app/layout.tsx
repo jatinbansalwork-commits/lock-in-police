@@ -27,8 +27,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${publicSans.variable} h-full`}>
-      <body className="font-sans antialiased bg-canvas text-text min-h-full">
+    <html
+      lang="en"
+      className={`${publicSans.variable} h-full`}
+      style={{ background: "#161c24", color: "#ffffff" }}
+    >
+      <body
+        className="font-sans antialiased bg-canvas text-text min-h-full"
+        style={{ margin: 0, minHeight: "100%", background: "#161c24", color: "#ffffff" }}
+      >
         {children}
       </body>
     </html>
